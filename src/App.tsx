@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { OfflineAlert } from "@/components/OfflineAlert";
 import { NotificationProvider } from "@/contexts/NotificationContext";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Home from "./pages/Home";
@@ -50,47 +51,49 @@ const App = () => {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <NotificationProvider>
-          <Toaster />
-          <Sonner />
-          <Analytics />
+      <ThemeProvider>
+        <TooltipProvider>
+          <NotificationProvider>
+            <Toaster />
+            <Sonner />
+            <Analytics />
 
-          <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/home" element={<Home />} />
-              <Route path="/discover" element={<Discover />} />
-              <Route path="/messages" element={<Messages />} />
-              <Route path="/notifications" element={<Notifications />} />
-              <Route path="/profile" element={<Profile />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/:username" element={<UserProfile />} />
-              <Route path="/:username/:postId" element={<UserProfile />} />
-              <Route path="/user/:userId" element={<UserProfile />} />
-              <Route path="/user/:userId/:postId" element={<UserProfile />} />
-              <Route path="/userprofile/:userId" element={<UserProfile />} />
-              <Route
-                path="/userprofile/:userId/:postId"
-                element={<UserProfile />}
-              />
-              <Route path="/auth-callback" element={<AuthCallback />} />
-              <Route path="/setup-username" element={<UsernameSetup />} />
-              <Route path="/onboarding" element={<Onboarding />} />
-              <Route path="/services" element={<ServicesAndBookingsPage />} />
-              <Route
-                path="/services/:serviceId"
-                element={<ServiceDetailPage />}
-              />
-              <Route path="/bookings" element={<ServicesAndBookingsPage />} />
-              <Route path="/bookings/:id" element={<BookingDetailsPage />} />
-              <Route path="/payment/:bookingId" element={<PaymentPage />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
-        </NotificationProvider>
-      </TooltipProvider>
+            <BrowserRouter>
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/home" element={<Home />} />
+                <Route path="/discover" element={<Discover />} />
+                <Route path="/messages" element={<Messages />} />
+                <Route path="/notifications" element={<Notifications />} />
+                <Route path="/profile" element={<Profile />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/:username" element={<UserProfile />} />
+                <Route path="/:username/:postId" element={<UserProfile />} />
+                <Route path="/user/:userId" element={<UserProfile />} />
+                <Route path="/user/:userId/:postId" element={<UserProfile />} />
+                <Route path="/userprofile/:userId" element={<UserProfile />} />
+                <Route
+                  path="/userprofile/:userId/:postId"
+                  element={<UserProfile />}
+                />
+                <Route path="/auth-callback" element={<AuthCallback />} />
+                <Route path="/setup-username" element={<UsernameSetup />} />
+                <Route path="/onboarding" element={<Onboarding />} />
+                <Route path="/services" element={<ServicesAndBookingsPage />} />
+                <Route
+                  path="/services/:serviceId"
+                  element={<ServiceDetailPage />}
+                />
+                <Route path="/bookings" element={<ServicesAndBookingsPage />} />
+                <Route path="/bookings/:id" element={<BookingDetailsPage />} />
+                <Route path="/payment/:bookingId" element={<PaymentPage />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </BrowserRouter>
+          </NotificationProvider>
+        </TooltipProvider>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 };

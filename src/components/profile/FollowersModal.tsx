@@ -138,7 +138,7 @@ export function FollowersModal({ isOpen, onClose, userId, currentUserId, onFollo
               {followers.map(follower => (
                 <div 
                   key={follower.follower_id}
-                  className="flex items-center justify-between p-3 hover:bg-white/5 rounded-md transition-colors cursor-pointer"
+                  className="flex items-center justify-between p-3 rounded-md transition-colors cursor-pointer"
                   onClick={() => handleFollowerClick(follower.follower_id)}
                 >
                   <div className="flex items-center gap-3">

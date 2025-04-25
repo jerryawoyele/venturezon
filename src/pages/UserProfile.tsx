@@ -232,8 +232,9 @@ export function UserProfile() {
 
         console.log(`Checking follow status: ${currentUser} following ${profile.id}`);
 
+        // Make sure we're using the correct IDs for the check
         const response = await fetch(
-          `${supabaseUrl}/rest/v1/follows?follower_id=eq.${currentUser}&following_id=eq.${profile.id}&select=id`,
+          `${supabaseUrl}/rest/v1/follows?follower_id=eq.${currentUser}&following_id=eq.${profile.id}`,
           { headers }
         );
 
@@ -243,7 +244,11 @@ export function UserProfile() {
 
         const followData = await response.json();
         console.log("Follow status check result:", followData);
-        setIsFollowing(followData && followData.length > 0);
+        
+        // Make sure we properly set the state based on the response
+        const following = followData && followData.length > 0;
+        console.log("Setting isFollowing to:", following);
+        setIsFollowing(following);
       } catch (error) {
         console.error("Error checking follow status:", error);
         setIsFollowing(false);
@@ -473,13 +478,20 @@ export function UserProfile() {
           setProfile(profileData as ProfileType);
 
           // Check if this is the current user's profile
-          setIsOwnProfile(profileData.id === currentUser);
+          const isOwn = currentUser && profileData.id === currentUser;
+          console.log("Is own profile check:", { profileId: profileData.id, currentUser, isOwn });
+          setIsOwnProfile(isOwn);
 
           // Load this user's content once we have their profile
-          setTimeout(() => loadContent(), 0);
+          loadContent();
 
-          // Check if the current user is following this profile
-          setTimeout(() => checkFollowStatus(), 0);
+          // Only check follow status if this is not the user's own profile
+          if (currentUser && !isOwn) {
+            console.log("Checking follow status since this is not the user's own profile");
+            checkFollowStatus();
+          } else {
+            console.log("Skipping follow status check:", { isOwn, currentUser });
+          }
         } else {
           console.error("Profile not found");
           setProfile(null);
@@ -512,6 +524,16 @@ export function UserProfile() {
       ensureReviewsData();
     }
   }, [profile, params, currentUser]);
+
+  // Effect to check follow status when currentUser or profile changes
+  useEffect(() => {
+    // Only check follow status if both profile and currentUser exist
+    // and it's not the user's own profile
+    if (profile && currentUser && profile.id !== currentUser) {
+      console.log("Checking follow status due to profile/currentUser change");
+      checkFollowStatus();
+    }
+  }, [profile?.id, currentUser]);
 
   // Add this function to fetch bookings for the customer
   const fetchBookings = async () => {
@@ -752,6 +774,8 @@ export function UserProfile() {
           return;
         }
 
+        console.log("Current follow status before action:", isFollowing);
+
         if (isFollowing) {
           // Unfollow logic - use REST API directly
           console.log(`Unfollowing: ${currentUser} unfollows ${profile?.id}`);
@@ -766,6 +790,8 @@ export function UserProfile() {
           if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
           }
+          
+          console.log("Successfully unfollowed user");
         } else {
           // Before following, check if the relationship already exists to avoid 409 conflict
           console.log(`Checking if ${currentUser} already follows ${profile?.id}`);
@@ -808,6 +834,8 @@ export function UserProfile() {
               console.error(`Follow error: ${response.status}`, await response.text());
               throw new Error(`HTTP error! status: ${response.status}`);
             }
+            
+            console.log("Successfully followed user");
 
             // Create a notification for the user being followed
             if (profile?.id && currentUser) {
@@ -834,6 +862,7 @@ export function UserProfile() {
 
         // Toggle follow status immediately for better UX
         const newFollowStatus = !isFollowing;
+        console.log("Setting new follow status to:", newFollowStatus);
         setIsFollowing(newFollowStatus);
 
         // Update followers count in the UI
@@ -1327,32 +1356,32 @@ export function UserProfile() {
                     {/* Stats row */}
                     <div className="flex flex-row flex-wrap justify-around mt-4 pt-4 ">
                       <div
-                        className="text-center cursor-pointer bg-background/50 hover:bg-background/20 px-12 py-4 rounded-md transition-colors"
+                        className="text-center cursor-pointer bg-background px-12 py-4 rounded-md transition-colors"
                         onClick={handlePostsClick}
                       >
                         <p className="font-semibold">{userPosts.length}</p>
-                        <p className="text-white/60 text-sm">Posts</p>
+                        <p className="dark:text-white text-dark text-sm">Posts</p>
                       </div>
 
                       <div
-                        className="text-center cursor-pointer bg-background/50 hover:bg-background/20 px-8 py-4 rounded-md transition-colors"
+                        className="text-center cursor-pointer bg-background px-8 py-4 rounded-md transition-colors"
                         onClick={() => setShowFollowersModal(true)}
                       >
                         <p className="font-semibold">{profile?.followers_count || 0}</p>
-                        <p className="text-white/60 text-sm">Followers</p>
+                        <p className="dark:text-white text-dark text-sm">Followers</p>
                       </div>
 
                       <div
-                        className="text-center cursor-pointer bg-background/50 hover:bg-background/20 px-8 py-4 rounded-md transition-colors"
+                        className="text-center cursor-pointer bg-background px-8 py-4 rounded-md transition-colors"
                         onClick={() => setShowFollowingModal(true)}
                       >
                         <p className="font-semibold">{profile?.following_count || 0}</p>
-                        <p className="text-white/60 text-sm">Following</p>
+                        <p className="dark:text-white text-dark text-sm">Following</p>
                       </div>
 
                       {profile?.user_role === "business" && (
                         <div
-                          className="text-center cursor-pointer bg-background/50 hover:bg-background/20 px-6 py-4 rounded-md transition-colors"
+                          className="text-center cursor-pointer bg-background px-6 py-4 rounded-md transition-colors"
                           onClick={handleOpenReviewsModal}
                         >
                           <div className="flex items-center justify-center gap-1">
@@ -1363,7 +1392,7 @@ export function UserProfile() {
                                 : '-'}
                             </p>
                           </div>
-                          <p className="text-white/60 text-sm">
+                          <p className="dark:text-white text-dark text-sm">
                             {profile?.reviews_count && profile.reviews_count > 0
                               ? `Rating (${profile?.reviews_count || 0})`
                               : 'No reviews yet'}

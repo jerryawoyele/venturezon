@@ -33,11 +33,30 @@ interface Post {
   };
 }
 
+interface Service {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  price: number;
+  image?: string;
+  location: string;
+  duration_minutes: number;
+  owner_id: string;
+  created_at: string;
+  ratings_count?: number;
+  ratings_sum?: number;
+  profiles?: {
+    username: string | null;
+    avatar_url: string | null;
+  };
+}
+
 export default function Discover() {
   const [activeTab, setActiveTab] = useState("Discover");
   const [discoverTab, setDiscoverTab] = useState("posts"); // "posts" or "services"
   const [posts, setPosts] = useState<Post[]>([]);
-  const [services, setServices] = useState<any[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
   const [loadingPosts, setLoadingPosts] = useState(true);
   const [loadingServices, setLoadingServices] = useState(true);
@@ -50,7 +69,7 @@ export default function Discover() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [filteredPosts, setFilteredPosts] = useState<Post[]>([]);
-  const [filteredServices, setFilteredServices] = useState<any[]>([]);
+  const [filteredServices, setFilteredServices] = useState<Service[]>([]);
   const location = useLocation();
 
   // Add a ref for the scroll area
@@ -363,7 +382,7 @@ export default function Discover() {
                 <div className="w-full h-16 bg-black/20 rounded-lg animate-pulse" />
                 
                 {/* Grid skeletons */}
-                <div className="grid grid-cols-2 bg-black/20 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3 gap-4">
                   {Array(12).fill(0).map((_, i) => (
                     <div key={i} className="aspect-square bg-black/20 rounded-lg animate-pulse" />
                   ))}
@@ -412,10 +431,10 @@ export default function Discover() {
                 </TabsList>
 
                 <TabsContent value="posts" className="pt-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3 gap-1 xs:gap-3 md:gap-4 lg:gap-6 xs:px-0">
                     {loadingPosts ? (
                       // Post loading skeletons
-                      Array(8).fill(0).map((_, i) => (
+                      Array(9).fill(0).map((_, i) => (
                         <Skeleton key={i} className="aspect-square bg-black/20 rounded-lg" />
                       ))
                     ) : filteredPosts.length === 0 ? (
@@ -435,7 +454,7 @@ export default function Discover() {
                         return (
                           <Card
                             key={post.id}
-                            className={`group overflow-hidden bg-black/20 border border-white/10 hover:border-white/20 transition-all cursor-pointer ${
+                            className={`group overflow-hidden bg-white dark:bg-black/20 border border-border hover:border-primary/20 dark:hover:border-white/20 transition-all cursor-pointer ${
                               isTextPost(post) ? 'text-card aspect-auto min-h-[200px]' : 'aspect-square'
                             }`}
                             onClick={() => handleCardClick(post, index)}
@@ -443,7 +462,7 @@ export default function Discover() {
                             <CardContent className="p-0 h-full flex flex-col">
                               {/* Media content or text preview */}
                               {preview.type === 'image' ? (
-                                <div className="relative flex-1 bg-black/40 group-hover:brightness-110 transition-all">
+                                <div className="relative flex-1 bg-background dark:bg-black/40 group-hover:brightness-110 transition-all">
                                   <img
                                     src={preview.url}
                                     alt="Post"
@@ -453,15 +472,15 @@ export default function Discover() {
                                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                                 </div>
                               ) : (
-                                <div className="flex-1 p-4 flex items-center justify-center bg-gradient-to-br bg-grey-200 ">
-                                  <p className="text-lg font-medium text-white line-clamp-4 text-center">
+                                <div className="flex-1 p-4 flex items-center justify-center bg-background dark:bg-gradient-to-br dark:from-gray-900 dark:to-black">
+                                  <p className="text-lg font-medium line-clamp-4 text-black dark:text-white text-center">
                                     {preview.content}
                                   </p>
                                 </div>
                               )}
                               
-                              {/* User info - always at bottom */}
-                              <div className="p-3 flex items-center text-white gap-2 bg-black/40 group-hover:bg-black/60 transition-colors">
+                              {/* User info - only show on larger screens */}
+                              <div className="hidden xs:flex p-3 items-center text-white gap-2 bg-black/40 group-hover:bg-black/60 transition-colors">
                                 <Avatar className="h-6 w-6">
                                   <AvatarImage src={post.profiles.avatar_url || ""} />
                                   <AvatarFallback className="text-xs">
@@ -481,7 +500,7 @@ export default function Discover() {
                 </TabsContent>
 
                 <TabsContent value="services" className="pt-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3 gap-1 xs:gap-3 md:gap-4 lg:gap-6">
                     {loadingServices ? (
                       Array(6).fill(0).map((_, index) => (
                         <Card key={index} className="overflow-hidden animate-pulse">
@@ -614,13 +633,13 @@ export default function Discover() {
                 
                 <div className="mt-8 border-t border-white/10 pt-6">
                   <h3 className="text-lg font-medium mb-4">More Posts</h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                    {posts.filter((_, i) => i !== selectedPostIndex).slice(0, 8).map((post, i) => {
+                  <div className="grid grid-cols-2 gap-1 px-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3 xs:gap-3 md:gap-4 lg:gap-6 xs:px-0">
+                    {posts.filter((_, i) => i !== selectedPostIndex).slice(0, 9).map((post, i) => {
                       const preview = getPostPreviewContent(post);
                       return (
                         <Card
                           key={post.id}
-                          className={`group overflow-hidden bg-black/20 border border-white/10 hover:border-white/20 transition-all cursor-pointer ${
+                          className={`group overflow-hidden bg-white dark:bg-black/20 border border-border hover:border-primary/20 dark:hover:border-white/20 transition-all cursor-pointer ${
                             isTextPost(post) ? 'text-card aspect-auto min-h-[120px]' : 'aspect-square'
                           }`}
                           onClick={() => {
@@ -640,7 +659,7 @@ export default function Discover() {
                           <CardContent className="p-0 h-full flex flex-col">
                             {/* Media content or text preview */}
                             {preview.type === 'image' ? (
-                              <div className="relative flex-1 bg-black/40 group-hover:brightness-110 transition-all">
+                              <div className="relative flex-1 bg-background dark:bg-black/40 group-hover:brightness-110 transition-all">
                                 <img
                                   src={preview.url}
                                   alt="Post"
@@ -649,8 +668,8 @@ export default function Discover() {
                                 />
                               </div>
                             ) : (
-                              <div className="flex-1 p-4 flex items-center justify-center bg-gradient-to-br bg-grey-200 ">
-                                  <p className="text-sm font-small truncate text-white line-clamp-4 text-center">
+                              <div className="flex-1 p-4 flex items-center justify-center bg-background dark:bg-gradient-to-br dark:from-gray-900 dark:to-black">
+                                  <p className="text-sm font-small truncate text-black dark:text-white line-clamp-4 text-center">
                                     {preview.content}
                                   </p>
                                 </div>

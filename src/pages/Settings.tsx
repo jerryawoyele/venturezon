@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { KYCVerification } from "@/components/kyc/KYCVerification";
 import { MainLayout } from "@/layouts/MainLayout";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Bell, CreditCard, Globe, Lock, LogOut, Save, Shield, User, Wallet, AlertCircle, ExternalLink, CheckCircle, AlertTriangle, Briefcase, Info, Loader2, ArrowLeft, DollarSign } from "lucide-react";
+import { Bell, CreditCard, Globe, Lock, LogOut, Save, Shield, User, Wallet, AlertCircle, ExternalLink, CheckCircle, AlertTriangle, Briefcase, Info, Loader2, ArrowLeft, DollarSign, Sun, Moon, Monitor } from "lucide-react";
 import { KYCVerificationService } from "@/utils/kyc-verification-service";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
@@ -29,6 +29,7 @@ import {
 } from "@/utils/stripe-components";
 import { StyledCardElement } from "@/utils/stripe-elements";
 import { PaymentProviderService, PaymentProvider, ProviderServiceType } from "@/utils/payment-provider-service";
+import { useTheme } from "@/contexts/ThemeContext";
 
 // Define interfaces
 interface PaymentMethod {
@@ -274,6 +275,12 @@ export default function Settings() {
   const location = useLocation();
   const { toast } = useToast();
 
+  // Theme settings
+  const { theme, setTheme } = useTheme();
+
+  // Add this at the top of the component
+  const usernameCheckTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   // Check for tab parameter in URL
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -459,7 +466,14 @@ export default function Settings() {
   }, [navigate, toast]);
 
   const checkUsernameAvailability = async (username: string) => {
-    if (!username || username.trim() === "" || username === userProfile?.username) {
+    // If username is empty or matches current user's username, it's considered "available"
+    if (!username || username.trim() === "") {
+      setUsernameAvailable(true);
+      return;
+    }
+    
+    // If it's the same as the current username, it's available
+    if (username === userProfile?.username) {
       setUsernameAvailable(true);
       return;
     }
@@ -467,25 +481,48 @@ export default function Settings() {
     setIsCheckingUsername(true);
 
     try {
+      // Check if username already exists in database
       const { data, error } = await supabase
         .from("profiles")
         .select("username")
-        .eq("username", username.toLowerCase())
-        .not("id", "eq", userId)
+        .ilike("username", username.toLowerCase()) // Use case-insensitive comparison
+        .not("id", "eq", userId) // Exclude current user
         .maybeSingle();
 
-      setUsernameAvailable(!data);
+      if (error) {
+        console.error("Error checking username:", error);
+        // On error, assume username is unavailable to be safe
+        setUsernameAvailable(false);
+      } else {
+        // If data is returned, username exists and is unavailable
+        setUsernameAvailable(!data);
+      }
     } catch (error) {
       console.error("Error checking username:", error);
+      setUsernameAvailable(false);
     } finally {
       setIsCheckingUsername(false);
     }
   };
 
   const handleUsernameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Only allow alphanumeric characters and underscores
     const value = e.target.value.replace(/[^a-zA-Z0-9_]/g, "").toLowerCase();
     setUsername(value);
-    checkUsernameAvailability(value);
+    
+    // Clear any existing timeout
+    if (usernameCheckTimeoutRef.current) {
+      clearTimeout(usernameCheckTimeoutRef.current);
+    }
+    
+    // Set a new timeout to check username availability after 500ms of no typing
+    if (value && value !== userProfile?.username) {
+      usernameCheckTimeoutRef.current = setTimeout(() => {
+        checkUsernameAvailability(value);
+      }, 500);
+    } else {
+      setUsernameAvailable(true);
+    }
   };
 
   const saveProfileSettings = async () => {
@@ -519,6 +556,7 @@ export default function Settings() {
         bio,
         about_business: aboutBusiness,
         business_name: businessName,
+        user_role: userProfile?.user_role,
         updated_at: new Date().toISOString(),
       };
 
@@ -917,9 +955,9 @@ export default function Settings() {
                 <Lock size={16} />
                 <span>Privacy</span>
               </TabsTrigger>
-              <TabsTrigger value="security" className="flex items-center gap-2">
+              <TabsTrigger value="verification" className="flex items-center gap-2">
                 <Shield size={16} />
-                <span>Security</span>
+                <span>Verification</span>
               </TabsTrigger>
               <TabsTrigger value="payments" className="flex items-center gap-2">
                 <Wallet size={16} />
@@ -969,54 +1007,47 @@ export default function Settings() {
                     </CardContent>
                   </Card>
 
-                  {/* Account Type */}
+                  {/* Appearance card - Added here */}
                   <Card className="col-span-1">
                     <CardHeader>
-                      <CardTitle>Account Type</CardTitle>
-                      <CardDescription>Choose the account type that best fits your needs on the platform.</CardDescription>
+                      <CardTitle>Appearance</CardTitle>
+                      <CardDescription>Customize how Venturezon looks for you</CardDescription>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="space-y-4">
                       <div className="space-y-4">
-                        <RadioGroup
-                          value={userProfile?.user_role || "customer"}
-                          onValueChange={(value) => {
-                            setUserProfile(prev => ({ ...prev, user_role: value }));
-                            setIsDirty(true);
-                          }}
-                        >
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="customer" id="customer" />
-                            <Label htmlFor="customer" className="flex items-center gap-2">
-                              <User className="h-4 w-4" />
-                              <div>
-                                <span className="font-medium">Customer Account</span>
-                                <p className="text-sm text-muted-foreground">For individuals looking to use the platform's services</p>
-                              </div>
-                            </Label>
-                          </div>
-
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="business" id="business" />
-                            <Label htmlFor="business" className="flex items-center gap-2">
-                              <Briefcase className="h-4 w-4" />
-                              <div>
-                                <span className="font-medium">Business Account</span>
-                                <p className="text-sm text-muted-foreground">For businesses offering services on the platform</p>
-                              </div>
-                            </Label>
-                          </div>
-                        </RadioGroup>
-
-                        {userProfile?.user_role === "business" && !userProfile?.kyc_verified && (
-                          <Alert className="mt-4">
-                            <Info className="h-4 w-4" />
-                            <AlertTitle>Verification Required</AlertTitle>
-                            <AlertDescription>
-                              Business accounts require verification before you can offer services.
-                              Please complete verification in the Verification tab.
-                            </AlertDescription>
-                          </Alert>
-                        )}
+                        <div>
+                          <h3 className="text-sm font-medium">Theme</h3>
+                          <p className="text-sm text-muted-foreground mb-3">
+                            Select your preferred theme
+                          </p>
+                          <RadioGroup 
+                            value={theme} 
+                            onValueChange={(value) => setTheme(value as "light" | "dark" | "system")}
+                            className="flex flex-col space-y-1"
+                          >
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="light" id="light" />
+                              <Label htmlFor="light" className="flex items-center">
+                                <Sun className="h-4 w-4 mr-2" />
+                                Light
+                              </Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="dark" id="dark" />
+                              <Label htmlFor="dark" className="flex items-center">
+                                <Moon className="h-4 w-4 mr-2" />
+                                Dark
+                              </Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="system" id="system" />
+                              <Label htmlFor="system" className="flex items-center">
+                                <Monitor className="h-4 w-4 mr-2" />
+                                System
+                              </Label>
+                            </div>
+                          </RadioGroup>
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -1055,18 +1086,38 @@ export default function Settings() {
                               value={username}
                               onChange={handleUsernameChange}
                               placeholder="Your username"
-                              className={`pr-10 ${!usernameAvailable ? 'border-red-500' : ''}`}
+                              className={`pr-10 ${!usernameAvailable && username.length > 0 ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                             />
                             {isCheckingUsername && (
                               <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
                                 <Loader2 className="h-4 w-4 animate-spin text-primary" />
                               </div>
                             )}
+                            {!isCheckingUsername && !usernameAvailable && username.length > 0 && (
+                              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                                <AlertCircle className="h-4 w-4 text-red-500" />
+                              </div>
+                            )}
+                            {!isCheckingUsername && usernameAvailable && username.length > 0 && username !== userProfile?.username && (
+                              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                                <CheckCircle className="h-4 w-4 text-green-500" />
+                              </div>
+                            )}
                           </div>
                         </div>
-                        <p className="text-xs text-muted-foreground">
-                          Your unique username for @mentions and profile URL
-                        </p>
+                        {!usernameAvailable && username.length > 0 ? (
+                          <p className="text-xs text-red-500">
+                            This username is already taken. Please choose another one.
+                          </p>
+                        ) : username.length > 0 && username !== userProfile?.username ? (
+                          <p className="text-xs text-green-500">
+                            Username is available!
+                          </p>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">
+                            Your unique username for @mentions and profile URL
+                          </p>
+                        )}
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="displayName">Display Name</Label>
@@ -1094,6 +1145,55 @@ export default function Settings() {
                       </div>
                     </div>
 
+                    {/* Account Type Selection */}
+                    <div className="space-y-2">
+                      <Label htmlFor="userRole">Account Type</Label>
+                      <div className="flex flex-row gap-4 pt-2">
+                        <label 
+                          className={`flex flex-col items-center p-4 rounded-lg border-2 cursor-pointer transition-all w-full max-w-[180px] ${
+                            userProfile?.user_role === "customer" 
+                              ? "border-primary bg-primary/10" 
+                              : "border-gray-200 hover:border-gray-300"
+                          }`}
+                        >
+                          <input 
+                            type="radio" 
+                            name="userRole" 
+                            value="customer" 
+                            checked={userProfile?.user_role === "customer"} 
+                            onChange={() => setUserProfile({...userProfile, user_role: "customer"})}
+                            className="sr-only" 
+                          />
+                          <div className="text-lg mb-2">👤</div>
+                          <div className="font-medium">Customer</div>
+                          <div className="text-xs text-muted-foreground text-center mt-1">
+                            Browse and book services
+                          </div>
+                        </label>
+                        
+                        <label 
+                          className={`flex flex-col items-center p-4 rounded-lg border-2 cursor-pointer transition-all w-full max-w-[180px] ${
+                            userProfile?.user_role === "business" 
+                              ? "border-primary bg-primary/10" 
+                              : "border-gray-200 hover:border-gray-300"
+                          }`}
+                        >
+                          <input 
+                            type="radio" 
+                            name="userRole" 
+                            value="business" 
+                            checked={userProfile?.user_role === "business"} 
+                            onChange={() => setUserProfile({...userProfile, user_role: "business"})}
+                            className="sr-only" 
+                          />
+                          <div className="text-lg mb-2">🛠️</div>
+                          <div className="font-medium">Business</div>
+                          <div className="text-xs text-muted-foreground text-center mt-1">
+                            Offer and manage services
+                          </div>
+                        </label>
+                      </div>
+                    </div>
 
                     <div className="space-y-2">
                       <Label htmlFor="bio">Bio</Label>
@@ -1475,7 +1575,6 @@ export default function Settings() {
             </div>
           </TabsContent>
 
-          {/* Payments Tab */}
           <TabsContent value="payments" className="space-y-6">
             <div>
               <h3 className="text-lg font-medium mb-4">Payment Settings</h3>
@@ -1870,72 +1969,6 @@ export default function Settings() {
                 </CardContent>
               </Card>
             </div>
-          </TabsContent>
-
-          <TabsContent value="security" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Security Settings</CardTitle>
-                <CardDescription>
-                  Manage your account security settings
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Password</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Last changed: Never
-                      </p>
-                    </div>
-                    <Button variant="outline" onClick={() => navigate('/reset-password')}>
-                      Change Password
-                    </Button>
-                  </div>
-
-                  <Separator />
-
-                  <div className="space-y-3">
-                    <h3 className="font-medium">Login Sessions</h3>
-                    <div className="p-3 border rounded-md">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium">Current Session</p>
-                          <p className="text-xs text-muted-foreground">
-                            Started: {new Date().toLocaleDateString()}
-                          </p>
-                        </div>
-                        <Badge variant="outline" className="bg-green-50 text-green-600">
-                          Active
-                        </Badge>
-                      </div>
-                    </div>
-                    <Button variant="outline" onClick={handleLogout} className="w-full sm:w-auto">
-                      <LogOut className="h-4 w-4 mr-2" />
-                      Sign Out of All Devices
-                    </Button>
-                  </div>
-
-                  <Separator />
-
-                  <div className="space-y-3">
-                    <h3 className="font-medium">Account Protection</h3>
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label htmlFor="two-factor">Two-Factor Authentication</Label>
-                        <p className="text-sm text-muted-foreground">
-                          Add an extra layer of security to your account
-                        </p>
-                      </div>
-                      <Button variant="outline" disabled>
-                        Coming Soon
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
           </TabsContent>
         </Tabs>
       </div>

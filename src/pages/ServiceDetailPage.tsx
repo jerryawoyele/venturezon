@@ -510,7 +510,7 @@ export default function ServiceDetailPage() {
         <Button
           variant="ghost"
           size="sm"
-          className="mb-6 flex min-h-screen items-center text-muted-foreground hover:text-foreground"
+          className="mb-6 flex items-center text-muted-foreground hover:text-foreground"
           onClick={() => navigate(-1)}
         >
           <ChevronLeft className="h-4 w-4 mr-1" />

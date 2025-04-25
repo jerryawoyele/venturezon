@@ -296,7 +296,7 @@ export default function Notifications() {
   return (
     <MainLayout activeTab={activeTab} setActiveTab={setActiveTab} userRole={userRole} isAuthenticated={true}>
       <div>
-        <div className="flex min-h-screen items-center justify-between gap-4 mb-6">
+        <div className="flex items-center justify-between gap-4 mb-6">
           <Button
             variant="ghost"
             size="sm"
@@ -351,7 +351,7 @@ export default function Notifications() {
                   </div>
                   {!notification.is_read && (
                     <Button 
-                      variant="ghost" 
+                      variant="outline" 
                       size="sm" 
                       onClick={(e) => {
                         e.stopPropagation();

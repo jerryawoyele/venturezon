@@ -147,7 +147,7 @@ export function ServiceCategoryTabs() {
                       <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500/20 to-purple-500/20 flex items-center justify-center shrink-0">
                         {category.icon}
                       </div>
-                      <h3 className="font-medium text-white text-sm md:text-base">{service}</h3>
+                      <h3 className="font-medium dark:text-white  text-black text-sm md:text-base">{service}</h3>
                     </div>
                   </CardContent>
                 </Card>

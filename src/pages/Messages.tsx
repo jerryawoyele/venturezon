@@ -712,7 +712,7 @@ export default function Messages() {
 
             <div className="flex-1 overflow-y-auto">
                   {loading ? (
-                <div className="p-8 text-center text-white/60">
+                <div className="p-8 text-center text-foreground/60">
                   Loading conversations...
                 </div>
               ) : filteredConversations.length > 0 ? (
@@ -720,8 +720,8 @@ export default function Messages() {
                   {filteredConversations.map((conversation) => (
                     <div 
                       key={conversation.id}
-                      className={`p-4 flex items-center gap-3 cursor-pointer hover:bg-white/5 ${
-                        selectedConversation?.id === conversation.id ? 'bg-white/10' : ''
+                      className={`p-4 flex items-center gap-3 cursor-pointer hover:bg-foreground/5 ${
+                        selectedConversation?.id === conversation.id ? 'bg-foreground/10' : ''
                       }`}
                       onClick={() => handleSelectConversation(conversation)}
                     >
@@ -736,17 +736,17 @@ export default function Messages() {
                       />
                       <div className="flex-1 min-w-0">
                         <div className="flex justify-between items-center">
-                          <h3 className="font-medium truncate">
+                          <h3 className="font-medium truncate text-foreground">
                             {conversation.profile.username || conversation.profile.auth_metadata?.full_name || 'User'}
                           </h3>
                           {conversation.last_message_time && (
-                            <span className="text-xs text-white/40">
+                            <span className="text-xs text-foreground/40">
                               {formatMessageTime(conversation.last_message_time)}
                             </span>
                           )}
                         </div>
                         <div className="flex justify-between items-center">
-                          <p className="text-sm text-white/60 truncate">
+                          <p className="text-sm text-foreground/60 truncate">
                             {conversation.last_message || "No messages yet"}
                           </p>
                           {conversation.unread_count > 0 && (
@@ -760,7 +760,7 @@ export default function Messages() {
                   ))}
                 </>
               ) : (
-                <div className="p-8 text-center text-white/60">
+                <div className="p-8 text-center text-foreground/60">
                   {searchQuery ? 'No conversations found' : 'No conversations yet'}
               </div>
             )}
@@ -772,7 +772,7 @@ export default function Messages() {
             {selectedConversation ? (
               <>
                 {/* Fixed header on mobile */}
-                <div className="p-2 border-b border-white/10 flex items-center gap-1 w-full fixed top-0 z-10 bg-background">
+                <div className="p-2 border-b border-foreground/10 flex items-center gap-1 w-full fixed top-0 z-10 bg-background">
                         <Button 
                           variant="ghost" 
                           size="icon" 
@@ -808,7 +808,7 @@ export default function Messages() {
                       <div key={group.date} className="space-y-4">
                         {/* Date header */}
                         <div className="flex items-center justify-center my-2">
-                          <div className="bg-white/10 rounded-full px-3 py-1 text-xs">
+                          <div className="bg-foreground/10 rounded-full px-3 py-1 text-xs">
                             {group.formattedDate}
                           </div>
                     </div>
@@ -849,12 +849,12 @@ export default function Messages() {
                                 <div 
                                   className={`max-w-[75%] p-3 rounded-lg ${
                                     message.sender_id === currentUserId 
-                                      ? 'bg-primary m-2 justify-self-end text-white' 
-                                      : 'bg-white/10 m-2 justify-self-start'
+                                      ? 'bg-primary m-2 justify-self-end text-primary-foreground' 
+                                      : 'bg-foreground/10 m-2 justify-self-start'
                                   }`}
                                 >
                                   {message.is_deleted ? (
-                                    <p className="italic text-white/50">This message was deleted</p>
+                                    <p className="italic text-foreground/50">This message was deleted</p>
                                   ) : (
                                     <>
                               <p>{message.content}</p>
@@ -903,7 +903,7 @@ export default function Messages() {
                           </div>
                         ))
                       ) : (
-                    <div className="h-full flex items-center justify-center text-white/40">
+                    <div className="h-full flex items-center justify-center text-foreground/40">
                       <p>Start a conversation with {selectedConversation.profile.username}</p>
                     </div>
                   )}
@@ -931,11 +931,11 @@ export default function Messages() {
                   </>
                 ) : (
               <div className="h-full flex items-center justify-center flex-col p-8 text-center">
-                <div className="bg-white/5 w-16 h-16 rounded-full flex items-center justify-center mb-4">
-                  <Send className="h-8 w-8 text-white/40" />
+                <div className="bg-foreground/5 w-16 h-16 rounded-full flex items-center justify-center mb-4">
+                  <Send className="h-8 w-8 text-foreground/40" />
                   </div>
                 <h2 className="text-xl font-medium mb-2">Your Messages</h2>
-                <p className="text-white/60 max-w-md">
+                <p className="text-foreground/60 max-w-md">
                   Select a conversation from the list or start a new one by visiting someone's profile
                 </p>
               </div>

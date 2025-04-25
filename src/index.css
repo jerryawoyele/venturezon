@@ -6,30 +6,54 @@
 
 @layer base {
   :root {
-    --background: 240 10% 10%; /* Lighter black for app background */
+    --background: 220 14% 95%;
+    --foreground: 220 14% 4%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 14% 4%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 14% 4%;
+    --primary: 267 100% 60%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 220 14% 90%;
+    --secondary-foreground: 220 14% 20%;
+    --muted: 220 14% 90%;
+    --muted-foreground: 220 14% 40%;
+    --accent: 220 14% 90%;
+    --accent-foreground: 220 14% 20%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 262.1 83.3% 57.8%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 240 10% 8%;
     --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%; /* Keep cards dark */
+    --card: 240 10% 12%;
     --card-foreground: 0 0% 98%;
-    --popover: 240 10% 1%;
+    --popover: 240 10% 8%;
     --popover-foreground: 0 0% 98%;
-    --primary: 267 100% 70%; /* Changed to purple */
+    --primary: 267 95% 70%;
     --primary-foreground: 240 5.9% 10%;
     --secondary: 240 3.7% 15.9%;
     --secondary-foreground: 0 0% 98%;
     --muted: 240 3.7% 15.9%;
     --muted-foreground: 240 5% 64.9%;
-    --accent: 267 100% 70%; /* Changed to purple */
+    --accent: 240 3.7% 15.9%;
     --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 85.7% 97.3%;
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
-    --ring: 267 100% 70%; /* Changed to purple */
-    --radius: 0.75rem;
+    --ring: 240 4.9% 83.9%;
   }
 }
 
 @layer base {
   * {
-    @apply border-border selection:bg-primary/10 selection:text-white;
+    @apply border-border selection:bg-primary/10 selection:text-foreground;
   }
   
   body {
@@ -44,7 +68,7 @@
 
 @layer utilities {
   .glass {
-    @apply bg-white/5 backdrop-blur-lg border border-white/10 shadow-[0_8px_8px_0_rgba(0,0,0,0.36)];
+    @apply bg-white/5 backdrop-blur-lg border border-white/10 shadow-[0_8px_8px_0_rgba(0,0,0,0.36)] dark:bg-white/5 dark:border-white/10;
   }
   
   /* Add utility classes for the new theme color */
@@ -60,14 +84,14 @@
   img {
     @apply object-cover;
     object-position: center;
-    background-color: rgba(255, 255, 255, 0.05);
+    background-color: rgba(0, 0, 0, 0.05);
   }
   
   img:before {
     content: '';
     display: block;
     padding-top: 75%;
-    background-color: rgba(255, 255, 255, 0.1);
+    background-color: rgba(0, 0, 0, 0.05);
   }
 }
 

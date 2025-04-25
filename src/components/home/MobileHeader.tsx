@@ -72,17 +72,17 @@ export function MobileHeader({
   };
 
   return (
-    <div className="flex flex-row items-center justify-between bg-black/80 backdrop-blur-md border-b border-white/10 p-4 lg:hidden fixed top-0 left-0 right-0 z-50">
+    <div className="flex flex-row items-center justify-between bg-card dark:bg-[hsl(240,10%,12%)] border-b border-border p-4 lg:hidden fixed top-0 left-0 right-0 z-50">
       <Link to="/" className="flex items-center space-x-2">
         <span className="font-bold text-2xl bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">Venturezon</span>
       </Link>
       
       <div className="relative search-container ml-auto">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/40 w-4 h-4" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
           <Input
             placeholder="Search..."
-            className="pl-9 max-md:w-[200px] md:[320px] pr-8 bg-white/5 border-white/10 focus:border-white/30 transition-colors"
+            className="pl-9 max-md:w-[200px] md:[320px] pr-8 bg-background border-input focus:border-ring transition-colors"
             value={searchQuery}
             onChange={handleChange}
             onKeyPress={handleSearch}
@@ -90,7 +90,7 @@ export function MobileHeader({
           />
           {searchQuery && (
             <button 
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/40 hover:text-white/70 transition-colors"
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
               onClick={clearSearch}
             >
               <X className="w-4 h-4" />

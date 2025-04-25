@@ -822,7 +822,7 @@ export function Post({
     <>
       <div className="max-w-2xl mx-auto w-full">
         <Card 
-          className="bg-black/60 hover:bg-black/70 border-white/5 transition-colors duration-200 overflow-hidden"
+          className="bg-white dark:bg-black/60 border-border transition-colors duration-200 overflow-hidden"
           onClick={handleCardClick}
         >
           <div className="px-3 pt-3 pb-1 flex items-start gap-3" onClick={(e) => e.stopPropagation()}>
@@ -840,7 +840,7 @@ export function Post({
                   profiles?.auth_metadata?.full_name ||
                   "User"}
               </div>
-              <span className="text-xs text-white/60">
+              <span className="text-xs text-muted-foreground">
                 {formatTimeAgo(created_at || new Date().toISOString())}
               </span>
             </div>
@@ -882,11 +882,11 @@ export function Post({
           </div>
           
           {isTextPost() ? (
-            <div className="p-6 bg-gradient-to-br from-gray-900 to-black flex items-center justify-center min-h-[200px]">
+            <div className="p-6 bg-background dark:bg-gradient-to-br dark:from-gray-900 dark:to-black flex items-center justify-center min-h-[200px]">
               <p className="text-lg md:text-xl font-medium text-center line-clamp-5">{captionState}</p>
             </div>
           ) : (
-            <div className="relative overflow-hidden bg-black">
+            <div className="relative overflow-hidden bg-background dark:bg-black">
               <div 
                 className="w-full flex transition-transform duration-300 ease-in-out" 
                 style={{ transform: `translateX(-${currentImageIndex * 100}%)` }}
@@ -991,7 +991,7 @@ export function Post({
                   e.stopPropagation();
                   handleLike();
                 }}
-                className={`${liked ? 'hover:bg-black/80' : 'hover:bg-white/10'}`}
+                className={`${liked ? 'hover:bg-secondary/50 dark:hover:bg-black/80' : 'hover:bg-secondary dark:hover:bg-white/10'}`}
               >
                 <Heart className={`w-5 h-5 ${liked ? 'fill-current text-primary' : ''}`} />
               </Button>
@@ -1024,7 +1024,7 @@ export function Post({
               >
                 {likesCount} likes
               </button>
-              <div className="text-white/60">
+              <div className="text-muted-foreground">
                 {commentsCount > 0 ? (
               <button 
                 className="hover:underline"
@@ -1044,7 +1044,7 @@ export function Post({
         </Card>
         
         <Dialog open={showCommentsModal} onOpenChange={setShowCommentsModal}>
-          <DialogContent className="sm:max-w-[600px] bg-black/90 border-white/10 max-h-[90vh]">
+          <DialogContent className="sm:max-w-[600px] bg-card border-border max-h-[90vh]">
             <DialogHeader>
               <DialogTitle>Comments</DialogTitle>
             </DialogHeader>
@@ -1073,12 +1073,12 @@ export function Post({
                         alt={comment.profile?.username || 'User'}
                         className="w-8 h-8 rounded-full"
                       />
-                      <div className="bg-white/5 p-2 rounded-lg flex-1">
+                      <div className="bg-secondary dark:bg-white/5 p-2 rounded-lg flex-1">
                         <div className="flex justify-between">
                           <p className="text-sm font-medium">
                             {comment.profile?.username || 'User'}
                           </p>
-                          <span className="text-xs text-white/40">{formatCommentDate(comment.created_at)}</span>
+                          <span className="text-xs text-muted-foreground">{formatCommentDate(comment.created_at)}</span>
                         </div>
                         <p className="text-sm">{comment.content}</p>
                         <div className="flex items-center mt-2 gap-4">

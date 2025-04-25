@@ -64,7 +64,7 @@ export function Header() {
     <>
       <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         scrolled 
-          ? 'bg-black/90 shadow-lg backdrop-blur-md border-b border-white/10' 
+          ? 'bg-background/90 dark:bg-black/90 shadow-lg backdrop-blur-md border-b border-border dark:border-white/10' 
           : 'bg-transparent'
       }`}>
         <nav className="container mx-auto flex items-center justify-between h-20 px-4 md:px-8">
@@ -74,7 +74,7 @@ export function Header() {
             transition={{ duration: 0.5 }}
           >
             <Link to="/" className="flex items-center space-x-2">
-              <span className="font-bold text-2xl bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">Venturezon</span>
+              <span className="font-bold text-2xl bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-600">Venturezon</span>
             </Link>
           </motion.div>
 
@@ -88,7 +88,7 @@ export function Header() {
                 <Button 
                   variant="ghost" 
                   onClick={handleLogoutClick}
-                  className="text-white hover:text-white/80 hover:bg-white/10"
+                  className="text-foreground hover:text-foreground/80 hover:bg-foreground/10 dark:text-white dark:hover:text-white/80 dark:hover:bg-white/10"
                 >
                   Sign Out
                 </Button>
@@ -101,7 +101,7 @@ export function Header() {
               >
                 <Link to="/auth">
                   <Button 
-                    className="font-medium bg-white/80  border-none"
+                    className="font-medium bg-primary/90 hover:bg-primary text-primary-foreground border-none"
                   >
                     Sign In
                   </Button>

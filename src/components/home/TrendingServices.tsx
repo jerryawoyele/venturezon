@@ -290,20 +290,20 @@ export function TrendingServices() {
     <div className="space-y-6">
       {/* Search bar */}
       <div className="relative search-container">
-        <div className="glass rounded-lg p-1">
+        <div className="rounded-lg p-1 border border-border bg-card">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/40" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
             <input
               type="text"
               placeholder="Search for services..."
-              className="w-full bg-white/5 border-0 rounded-lg py-2 pl-10 pr-10 text-white placeholder:text-white/40 focus:ring-0 focus:outline-none focus:bg-white/10 transition-colors"
+              className="w-full bg-background border-0 rounded-lg py-2 pl-10 pr-10 text-foreground placeholder:text-muted-foreground focus:ring-0 focus:outline-none focus:bg-secondary transition-colors"
               value={searchQuery}
               onChange={handleChange}
               onFocus={() => setShowResults(true)}
             />
             {searchQuery && (
               <button 
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/40 hover:text-white/70 transition-colors"
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                 onClick={() => {
                   setSearchQuery("");
                   setShowResults(false);
@@ -323,13 +323,13 @@ export function TrendingServices() {
         </div>
       </div>
 
-      <Card className="p-6 bg-black/20 border-white/5">
+      <Card className="p-6 bg-card border-border">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-semibold">Trending Services</h2>
           <Button 
             variant="ghost" 
             size="sm" 
-            className="text-primary hover:text-white"
+            className="text-primary hover:text-foreground"
             onClick={handleExploreMore}
           >
             Explore More <ArrowRight className="ml-1 h-4 w-4" />
@@ -342,7 +342,7 @@ export function TrendingServices() {
             <Badge 
               key={category}
               variant="outline" 
-              className="cursor-pointer hover:bg-white/10 transition-colors"
+              className="cursor-pointer hover:bg-secondary transition-colors"
               onClick={() => handleCategoryClick(category)}
             >
               {category}
@@ -354,21 +354,21 @@ export function TrendingServices() {
           {loading ? (
             // Loading skeleton
             Array(3).fill(0).map((_, i) => (
-              <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-white/5 animate-pulse">
+              <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-background animate-pulse">
                 <div className="flex gap-3">
-                  <div className="w-4 h-4 bg-white/10 rounded" />
+                  <div className="w-4 h-4 bg-muted rounded" />
                   <div>
-                    <div className="h-4 w-32 bg-white/10 rounded mb-2" />
-                    <div className="h-3 w-40 bg-white/10 rounded" />
+                    <div className="h-4 w-32 bg-muted rounded mb-2" />
+                    <div className="h-3 w-40 bg-muted rounded" />
                   </div>
                 </div>
-                <div className="h-3 w-16 bg-white/10 rounded" />
+                <div className="h-3 w-16 bg-muted rounded" />
               </div>
             ))
           ) : trendingServices && trendingServices.length > 0 ? (
             <div className="space-y-4">
               {trendingServices.map((service, index) => (
-                <Card key={service.id} className="rounded-lg overflow-hidden border-white/10 hover:border-white/20 bg-black/20 hover:bg-black/30 transition-all duration-200">
+                <Card key={service.id} className="rounded-lg overflow-hidden border-border hover:border-primary/20 bg-white dark:bg-black/20 hover:bg-secondary/50 dark:hover:bg-black/30 transition-all duration-200">
                   <Link to={`/services/${service.id}`}>
                     <div className="cursor-pointer flex flex-col md:flex-row">
                       <div className="aspect-video w-full md:w-1/3 relative overflow-hidden">
@@ -385,12 +385,12 @@ export function TrendingServices() {
                           />
                         ) : (
                           <div className="w-full h-full bg-gradient-to-br from-gray-900 to-black flex items-center justify-center">
-                            <Package2 className="h-1/3 w-1/3 text-white/20" />
+                            <Package2 className="h-1/3 w-1/3 text-muted-foreground" />
                           </div>
                         )}
                         
                         <div className="absolute bottom-2 right-2 z-20">
-                          <Badge variant="secondary" className="bg-black/60 hover:bg-black/80">
+                          <Badge variant="secondary" className="bg-background/80 dark:bg-black/60 hover:bg-background dark:hover:bg-black/80">
                             {(service.bookingCount || 0) > 0 ? `${service.bookingCount} ${service.bookingCount === 1 ? 'booking' : 'bookings'}` : 'New'}
                           </Badge>
                         </div>
@@ -440,7 +440,7 @@ export function TrendingServices() {
                           {service.category && (
                             <Badge 
                               variant="outline" 
-                              className="cursor-pointer hover:bg-white/10"
+                              className="cursor-pointer hover:bg-secondary"
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
@@ -458,14 +458,14 @@ export function TrendingServices() {
               ))}
             </div>
           ) : (
-            <div className="text-center text-white/60 py-4">
+            <div className="text-center text-muted-foreground py-4">
               No services available at this time
             </div>
           )}
         </div>
       </Card>
 
-      <div className="text-center text-sm text-white/60 p-4 mt-0">
+      <div className="text-center text-sm text-muted-foreground p-4 mt-0">
         <p>&copy; {new Date().getFullYear()} Venturezon</p>
         <p className="mt-1">All rights reserved.</p>
       </div>

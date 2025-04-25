@@ -32,7 +32,8 @@ import {
   MoreVertical, 
   LogOut,
   Edit,
-  ArrowLeft
+  ArrowLeft,
+  CheckCircle
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -1333,33 +1334,33 @@ export function Profile() {
                 {/* Stats row */}
                 <div className="flex flex-row flex-wrap justify-around mt-4 pt-4">
                   <div
-                    className="text-center cursor-pointer mb-4 bg-background/50 hover:bg-background/20 px-12 py-4 rounded-md transition-colors"
+                    className="text-center cursor-pointer mb-4 bg-background px-12 py-4 rounded-md transition-colors"
                     onClick={handlePostsClick}
                   >
                     <p className="font-semibold">{userPosts.length}</p>
-                    <p className="text-white/60 text-sm">Posts</p>
+                    <p className="dark:text-white text-dark text-sm">Posts</p>
                   </div>
                   
                   <div
-                    className="text-center cursor-pointer mb-4 bg-background/50 hover:bg-background/20 px-8 py-4 rounded-md transition-colors"
+                    className="text-center cursor-pointer mb-4 bg-background px-8 py-4 rounded-md transition-colors"
                     onClick={() => setShowFollowersModal(true)}
                   >
                     <p className="font-semibold">{profile?.followers_count || 0}</p>
-                    <p className="text-white/60 text-sm">Followers</p>
+                    <p className="dark:text-white text-dark text-sm">Followers</p>
                   </div>
                   
                   <div
-                    className="text-center cursor-pointer mb-4 bg-background/50 hover:bg-background/20 px-8 py-4 rounded-md transition-colors"
+                    className="text-center cursor-pointer mb-4 bg-background px-8 py-4 rounded-md transition-colors"
                     onClick={() => setShowFollowingModal(true)}
                   >
                     <p className="font-semibold">{profile?.following_count || 0}</p>
-                    <p className="text-white/60 text-sm">Following</p>
+                    <p className="dark:text-white text-dark text-sm">Following</p>
                   </div>
                   
                   {profile?.user_role === "business" && (
                     <div 
                       onClick={() => setShowReviewsModal(true)}
-                      className="text-center cursor-pointer mb-4 bg-background/50 hover:bg-background/20 px-6 py-4 rounded-md transition-colors"
+                      className="text-center cursor-pointer mb-4 bg-background px-6 py-4 rounded-md transition-colors"
                     >
                       <div className="flex items-center justify-center gap-1">
                         <Star className="w-4 h-4 text-yellow-400" />
@@ -1369,7 +1370,7 @@ export function Profile() {
                             : '-'}
                         </p>
                       </div>
-                      <p className="text-white/60 text-sm">
+                      <p className="dark:text-white text-dark text-sm">
                         {profile?.reviews_count && profile.reviews_count > 0
                           ? `Reviews (${profile?.reviews_count})`
                           : 'No reviews'}
@@ -1741,99 +1742,36 @@ export function Profile() {
                 <div className="space-y-2">
                   <Label htmlFor="username">Username</Label>
                   <div className="relative">
-                  <Input 
-                    id="username" 
-                    value={username} 
-                      onChange={handleUsernameChange} 
-                      className={`pr-10 ${isUsernameAvailable === false ? 'border-red-500' : ''}`}
+                    <Input
+                      id="username"
+                      value={username}
+                      onChange={handleUsernameChange}
+                      placeholder="Enter username"
+                      className={isUsernameAvailable === false ? "border-red-500 pr-10" : "pr-10"}
                     />
                     {isCheckingUsername && (
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                        <svg className="animate-spin h-5 w-5 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                        <div className="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full" />
                       </div>
                     )}
-                    {!isCheckingUsername && isUsernameAvailable === true && (
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                        <svg className="h-5 w-5 text-green-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                        </svg>
-                      </div>
-                    )}
-                    {!isCheckingUsername && isUsernameAvailable === false && (
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                        <svg className="h-5 w-5 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                        </svg>
-                      </div>
+                    {!isCheckingUsername && username && isUsernameAvailable === true && (
+                      <CheckCircle className="absolute right-3 top-1/2 transform -translate-y-1/2 text-green-500 h-4 w-4" />
                     )}
                   </div>
                   {isUsernameAvailable === false && (
-                    <p className="text-red-500 text-sm mt-1">Username is already taken</p>
+                    <p className="text-sm text-red-500">This username is already taken.</p>
                   )}
                 </div>
                 
                 {/* Bio */}
                 <div className="space-y-2">
                   <Label htmlFor="bio">Bio</Label>
-                  <Textarea 
-                    id="bio" 
-                    value={bio} 
-                    onChange={(e) => setBio(e.target.value)} 
-                    className="min-h-[100px]"
+                  <Textarea
+                    id="bio"
+                    value={bio}
+                    onChange={(e) => setBio(e.target.value)}
+                    placeholder="Tell us about yourself..."
                   />
-                </div>
-                
-                {/* User Role - Card Radio Buttons */}
-                <div className="space-y-2">
-                  <Label htmlFor="userRole">I am a</Label>
-                  <div className="grid grid-cols-2 gap-4 pt-2">
-                    <label 
-                      className={`flex flex-col items-center p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                        userRole === "customer" 
-                          ? "border-primary bg-primary/10" 
-                          : "border-gray-200 hover:border-gray-300"
-                      }`}
-                    >
-                      <input 
-                        type="radio" 
-                        name="userRole" 
-                        value="customer" 
-                        checked={userRole === "customer"} 
-                        onChange={() => setUserRole("customer")}
-                        className="sr-only" 
-                      />
-                      <div className="text-lg mb-2">👤</div>
-                      <div className="font-medium">Customer</div>
-                      <div className="text-xs text-gray-500 text-center mt-1">
-                        Browse and book services
-                      </div>
-                    </label>
-                    
-                    <label 
-                      className={`flex flex-col items-center p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                        userRole === "business" 
-                          ? "border-primary bg-primary/10" 
-                          : "border-gray-200 hover:border-gray-300"
-                      }`}
-                    >
-                      <input 
-                        type="radio" 
-                        name="userRole" 
-                        value="business" 
-                        checked={userRole === "business"} 
-                        onChange={() => setUserRole("business")}
-                        className="sr-only" 
-                      />
-                      <div className="text-lg mb-2">🛠️</div>
-                      <div className="font-medium">Service Provider</div>
-                      <div className="text-xs text-gray-500 text-center mt-1">
-                        Offer and manage services
-                      </div>
-                    </label>
-                  </div>
                 </div>
               </div>
               

@@ -54,7 +54,7 @@ export default function Home() {
   const [posts, setPosts] = useState<ScoredPost[]>([]);
   const [randomPosts, setRandomPosts] = useState<ScoredPost[]>([]);
   const [profiles, setProfiles] = useState<ProfileType[]>([]);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<{ id: string } | null>(null);
   const [userRole, setUserRole] = useState<"business" | "customer" | null>(null);
   const navigate = useNavigate();
   const [initialLoading, setInitialLoading] = useState(true);
@@ -70,6 +70,7 @@ export default function Home() {
   const [followedUserIds, setFollowedUserIds] = useState<string[]>([]);
   const [hasFollowedPosts, setHasFollowedPosts] = useState(false);
   const postsPerPage = 5;
+  const randomPostsPerPage = 7; // Separate constant for random posts loading
   
   // Store likes and comments per post for scoring
   const [likesCountMap, setLikesCountMap] = useState<Record<string, number>>({});
@@ -361,7 +362,7 @@ export default function Home() {
 
   const fetchPostsWithRanking = async (userIds: string[], pageNum: number = 1, isLoadMore = false) => {
     // No need to add current user ID here anymore as we've already included it in the userIds list
-    let idsToFetch = [...userIds];
+    const idsToFetch = [...userIds];
     
     if (idsToFetch.length === 0) {
       setLoadingPosts(false);
@@ -546,9 +547,9 @@ export default function Home() {
       
       console.log(`Fetching random posts, excluding ${excludePostIds.length} posts`);
       
-      // Calculate pagination
-      const from = (randomPage - 1) * postsPerPage;
-      const to = from + postsPerPage - 1;
+      // Calculate pagination - use randomPostsPerPage instead of postsPerPage
+      const from = (randomPage - 1) * randomPostsPerPage;
+      const to = from + randomPostsPerPage - 1;
       
       // Create a base query without post filtering yet
       let query = supabase
@@ -570,8 +571,7 @@ export default function Home() {
             kyc_verified
           )
         `)
-        .order('created_at', { ascending: false })
-        .range(from, to);
+        .order('created_at', { ascending: false });
       
       // Add NOT IN filter when we have posts to exclude
       if (excludePostIds.length > 0) {
@@ -579,6 +579,9 @@ export default function Home() {
         const idsString = `(${excludePostIds.join(',')})`;
         query = query.not('id', 'in', idsString);
       }
+      
+      // Apply pagination after filters to ensure we get the correct number of posts
+      query = query.range(from, to);
       
       const { data: randomPostsData, error } = await query;
       
@@ -634,11 +637,26 @@ export default function Home() {
         
         console.log(`Found ${randomPostsData.length} random posts, ${trulyUniqueRandomPosts.length} are truly unique`);
         
-        // Set the random posts - append if loading more, replace if initial load
+        // Set the random posts - always append when loading more
         if (randomPage > 1) {
-          setRandomPosts(prevPosts => [...prevPosts, ...trulyUniqueRandomPosts]);
+          // Prevent duplicates by checking IDs of existing posts
+          const existingIds = new Set(randomPosts.map(post => post.id));
+          const uniqueNewPosts = trulyUniqueRandomPosts.filter(post => !existingIds.has(post.id));
+          
+          // Always add any new posts we found, but only update more status if we got new posts
+          if (uniqueNewPosts.length > 0) {
+            setRandomPosts(prevPosts => [...prevPosts, ...uniqueNewPosts]);
+            // Only consider having more posts if we received a full page of data
+            setHasMoreRandomPosts(uniqueNewPosts.length >= randomPostsPerPage);
+          } else {
+            // If no new unique posts were found, there are no more posts to load
+            setHasMoreRandomPosts(false);
+          }
         } else {
+          // Initial load - set the posts
           setRandomPosts(trulyUniqueRandomPosts);
+          // Only set hasMoreRandomPosts to true if we got a full page of posts (indicating there may be more)
+          setHasMoreRandomPosts(trulyUniqueRandomPosts.length >= randomPostsPerPage);
         }
         
         // Record impressions for promoted posts
@@ -647,13 +665,11 @@ export default function Home() {
             recordImpression(post.promotedPostId);
           }
         });
-        
-        // Set whether there are more posts to load
-        setHasMoreRandomPosts(randomPostsData.length === postsPerPage);
       } else {
         if (randomPage === 1) {
           setRandomPosts([]);
         }
+        // Always set to false if we got zero results
         setHasMoreRandomPosts(false);
       }
       
@@ -661,6 +677,7 @@ export default function Home() {
     } catch (error) {
       console.error("Error fetching random posts:", error);
       setLoadingRandomPosts(false);
+      setHasMoreRandomPosts(false);
     }
   };
 
@@ -679,13 +696,11 @@ export default function Home() {
     setRandomPage(nextPage);
     setLoadingMoreRandom(true);
     
-    // Get the IDs of both main feed posts and already loaded random posts
+    // Get the IDs of main feed posts only
     const mainFeedPostIds = posts.map(post => post.id);
-    const currentRandomPostIds = randomPosts.map(post => post.id);
-    const allPostIdsToExclude = [...mainFeedPostIds, ...currentRandomPostIds];
     
-    // Fetch more random posts, excluding both main feed posts and existing random posts
-    fetchRandomPostsWithExclusions(allPostIdsToExclude).finally(() => {
+    // Fetch more random posts, excluding only main feed posts
+    fetchRandomPostsWithExclusions(mainFeedPostIds).finally(() => {
       setLoadingMoreRandom(false);
     });
   };
@@ -783,9 +798,8 @@ export default function Home() {
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg ml-4 font-semibold">Latest Posts</h2>
                 <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="text-gray-800 hover:text-gray-800 hover:bg-gray-300 mr-4 bg-primary" 
+                  variant="outline" 
+                  size="sm"  
                   onClick={refreshPosts}
                 >
                   <RefreshCw className="h-4 w-4 mr-1" />
@@ -923,23 +937,29 @@ export default function Home() {
                         />
                       ))}
                       
-                      {/* Load more button for discovery posts */}
-                      {hasMoreRandomPosts && (
+                      {/* Load more button for discovery posts - only show if more posts are available */}
+                      {hasMoreRandomPosts && !loadingMoreRandom && (
                         <div className="flex justify-center">
                           <Button 
                             variant="outline" 
                             onClick={loadMoreRandomPosts} 
-                            disabled={loadingMoreRandom}
                             className="mt-2"
                           >
-                            {loadingMoreRandom ? (
-                              <>
-                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                                Loading...
-                              </>
-                            ) : (
-                              "Discover More"
-                            )}
+                            Discover More
+                          </Button>
+                        </div>
+                      )}
+                      
+                      {/* Loading state for "Discover More" */}
+                      {loadingMoreRandom && (
+                        <div className="flex justify-center">
+                          <Button 
+                            variant="outline" 
+                            disabled
+                            className="mt-2"
+                          >
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            Loading...
                           </Button>
                         </div>
                       )}

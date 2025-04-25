@@ -16,6 +16,9 @@ import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { motion } from "framer-motion";
 import { Loader2 } from "lucide-react";
+import { Link } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
+import { Check, Shield, Star } from "lucide-react";
 
 const GoogleIcon = () => (
   <svg
@@ -115,7 +118,7 @@ export default function Auth() {
       const hasUpperCase = /[A-Z]/.test(password);
       const hasLowerCase = /[a-z]/.test(password);
       const hasNumbers = /\d/.test(password);
-      const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+/.test(password);
+      const hasSpecialChar = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]+/.test(password);
       
       if (!(hasUpperCase && hasLowerCase && hasNumbers) && !hasSpecialChar) {
         toast({
@@ -297,245 +300,298 @@ export default function Auth() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-gradient-to-b from-black via-gray-900 to-black">
-      {/* Header with logo */}
-      <header className="w-full p-4 flex justify-center z-10">
-        <div className="container flex justify-between items-center">
-          <a href="/" className="flex items-center">
-            <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
-              Venturezon
-            </h1>
-          </a>
-        </div>
-      </header>
-
-      <main className="flex-1 flex items-center justify-center p-4 md:p-8">
-        <div className="absolute inset-0 z-0">
-          <div className="absolute inset-0 bg-grid-white/5 bg-grid-16 [mask-image:radial-gradient(ellipse_at_center,white,transparent_70%)]"></div>
+    <div className="min-h-screen flex flex-col bg-gradient-to-b from-background via-background to-background dark:from-black dark:via-gray-900 dark:to-black">
+      <div className="container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex-1 flex flex-col py-10">
+        <div className="flex justify-between items-center mb-8">
+          <Link to="/" className="flex items-center gap-2">
+            <span className="font-bold text-2xl bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-600">Venturezon</span>
+          </Link>
+          
+          <Link to="/" className="text-sm text-foreground/70 dark:text-white/70 hover:text-foreground dark:hover:text-white flex items-center gap-1 transition-colors">
+            <ArrowLeft className="h-4 w-4" />
+            Back to Home
+          </Link>
         </div>
 
-        {resetPassword ? (
-          <div className="z-10 relative w-full max-w-md">
-            <Card className="border-none bg-black/60 backdrop-blur-sm">
-              <CardHeader>
-                <CardTitle className="text-center">Reset your password</CardTitle>
-                <CardDescription className="text-center">
-                  Enter your email address and we will send you a link to reset your password.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handlePasswordReset} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="Enter your email"
-                      autoComplete="email"
-                      className="border border-gray-700 bg-black/40"
-                      required
-                    />
+        <div className="flex-1 flex flex-col md:flex-row gap-8 md:gap-12 items-center">
+          <div className="w-full md:w-1/2 lg:w-6/12 flex flex-col items-center md:items-start">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              className="max-w-md"
+            >
+              <h1 className="text-4xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-600 text-center md:text-left">
+                {resetPassword ? "Reset Your Password" : "Welcome to Venturezon"}
+              </h1>
+              <p className="text-lg text-foreground/70 dark:text-white/70 mb-8 text-center md:text-left">
+                {resetPassword
+                  ? "Enter your email to receive password reset instructions"
+                  : "Join our community of service providers and customers."
+                }
+              </p>
+              
+              <div className="hidden md:block">
+                <div className="grid grid-cols-3 gap-4 mb-8">
+                  <div className="flex flex-col items-center">
+                    <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-2">
+                      <Check className="h-6 w-6 text-primary" />
+                    </div>
+                    <span className="text-sm text-foreground/80 dark:text-white/80 text-center">Easy To Use</span>
                   </div>
-                  <Button
-                    type="submit"
-                    className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 transition-all"
-                    disabled={loading}
-                  >
-                    {loading ? (
-                      <span className="flex items-center">
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Processing
-                      </span>
-                    ) : (
-                      "Send Reset Link"
-                    )}
-                  </Button>
-                  <div className="text-center">
-                    <Button
-                      variant="link"
-                      onClick={() => setResetPassword(false)}
-                      className="text-white/70 hover:text-white"
-                    >
-                      Back to login
-                    </Button>
+                  <div className="flex flex-col items-center">
+                    <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-2">
+                      <Shield className="h-6 w-6 text-primary" />
+                    </div>
+                    <span className="text-sm text-foreground/80 dark:text-white/80 text-center">Secure Payments</span>
                   </div>
-                </form>
-              </CardContent>
-            </Card>
+                  <div className="flex flex-col items-center">
+                    <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-2">
+                      <Star className="h-6 w-6 text-primary" />
+                    </div>
+                    <span className="text-sm text-foreground/80 dark:text-white/80 text-center">Trusted Services</span>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
           </div>
-        ) : (
-          <div className="z-10 relative w-full max-w-md">
-            <Card className="border-none bg-black/60 backdrop-blur-sm">
-              <CardHeader>
-                <CardTitle className="text-center text-2xl font-bold mb-1">
-                  <span className="bg-clip-text text-transparent bg-slate-300">
-                    Welcome to Venturezon
-                  </span>
-                </CardTitle>
-                <CardDescription className="text-center text-white/70">
-                  Sign in to your account or create a new one
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Tabs defaultValue="login">
-                  <TabsList className="grid w-full grid-cols-2 mb-6">
-                    <TabsTrigger value="login">Login</TabsTrigger>
-                    <TabsTrigger value="register">Register</TabsTrigger>
+
+          <div className="w-full md:w-1/2 lg:w-5/12">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+            >
+              {resetPassword ? (
+                <Card className="border-border w-full">
+                  <CardHeader>
+                    <CardTitle>Reset Password</CardTitle>
+                    <CardDescription>
+                      Enter your email to receive a password reset link
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <form onSubmit={handlePasswordReset} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="email">Email</Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          placeholder="your.email@example.com"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          required
+                        />
+                      </div>
+                      <Button
+                        type="submit"
+                        className="w-full"
+                        disabled={loading}
+                      >
+                        {loading ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Sending Email...
+                          </>
+                        ) : (
+                          "Send Reset Link"
+                        )}
+                      </Button>
+                    </form>
+                  </CardContent>
+                  <CardFooter className="flex justify-center border-t pt-4">
+                    <Button variant="link" onClick={() => setResetPassword(false)}>
+                      Back to Sign In
+                    </Button>
+                  </CardFooter>
+                </Card>
+              ) : (
+                <Tabs defaultValue="signin" className="w-full">
+                  <TabsList className="grid w-full grid-cols-2 mb-4">
+                    <TabsTrigger value="signin">Sign In</TabsTrigger>
+                    <TabsTrigger value="signup">Sign Up</TabsTrigger>
                   </TabsList>
-                  <TabsContent value="login">
-                    <form onSubmit={handleSignIn} className="space-y-5">
-                      <div className="space-y-3">
-                        <div className="space-y-2">
-                          <Label htmlFor="email-login">Email</Label>
-                          <Input
-                            id="email-login"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            placeholder="Enter your email"
-                            autoComplete="email"
-                            className="border border-gray-700 bg-black/40"
-                            required
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <Label htmlFor="password-login">Password</Label>
-                            <Button
-                              variant="link"
-                              type="button"
-                              onClick={() => setResetPassword(true)}
-                              className="text-xs p-0 h-auto text-white/70 hover:text-white"
-                            >
-                              Forgot password?
-                            </Button>
+                  
+                  <TabsContent value="signin">
+                    <Card className="border-border">
+                      <CardHeader>
+                        <CardTitle>Sign In</CardTitle>
+                        <CardDescription>
+                          Enter your credentials to access your account
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <form onSubmit={handleSignIn} className="space-y-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="signin-email">Email</Label>
+                            <Input
+                              id="signin-email"
+                              type="email"
+                              placeholder="your.email@example.com"
+                              value={email}
+                              onChange={(e) => setEmail(e.target.value)}
+                              required
+                            />
                           </div>
-                          <Input
-                            id="password-login"
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            placeholder="Enter your password"
-                            autoComplete="current-password"
-                            className="border border-gray-700 bg-black/40"
-                            required
-                          />
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <Label htmlFor="signin-password">Password</Label>
+                              <Button
+                                variant="link"
+                                className="p-0 h-auto text-xs"
+                                onClick={() => setResetPassword(true)}
+                                type="button"
+                              >
+                                Forgot password?
+                              </Button>
+                            </div>
+                            <Input
+                              id="signin-password"
+                              type="password"
+                              placeholder="••••••••"
+                              value={password}
+                              onChange={(e) => setPassword(e.target.value)}
+                              required
+                            />
+                          </div>
+                          <Button
+                            type="submit"
+                            className="w-full"
+                            disabled={loading}
+                          >
+                            {loading ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Signing In...
+                              </>
+                            ) : (
+                              "Sign In"
+                            )}
+                          </Button>
+                        </form>
+
+                        <div className="relative my-4">
+                          <div className="absolute inset-0 flex items-center">
+                            <span className="w-full border-t"></span>
+                          </div>
+                          <div className="relative flex justify-center text-xs">
+                            <span className="bg-card px-2 text-foreground/70 dark:text-white/70">
+                              or
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                      <Button
-                        type="submit"
-                        className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 transition-all"
-                        disabled={loading}
-                      >
-                        {loading ? (
-                          <span className="flex items-center">
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Signing in
-                          </span>
-                        ) : (
-                          "Sign in"
-                        )}
-                      </Button>
-                    </form>
+
+                        <div className="flex justify-center">
+                          <Button
+                            variant="outline"
+                            className="w-full flex items-center justify-center gap-2"
+                            type="button"
+                            onClick={() => handleOAuthSignIn("google")}
+                            disabled={loading}
+                          >
+                            <GoogleIcon />
+                            <span>Continue with Google</span>
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
                   </TabsContent>
-                  <TabsContent value="register">
-                    <form onSubmit={handleSignUp} className="space-y-5">
-                      <div className="space-y-3">
-                        <div className="space-y-2">
-                          <Label htmlFor="name">Full Name</Label>
-                          <Input
-                            id="name"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            placeholder="Enter your full name"
-                            autoComplete="name"
-                            className="border border-gray-700 bg-black/40"
-                            required
-                          />
+                  
+                  <TabsContent value="signup">
+                    <Card className="border-border">
+                      <CardHeader>
+                        <CardTitle>Sign Up</CardTitle>
+                        <CardDescription>
+                          Create a new account to get started
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <form onSubmit={handleSignUp} className="space-y-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="signup-name">Full Name</Label>
+                            <Input
+                              id="signup-name"
+                              type="text"
+                              placeholder="John Doe"
+                              value={name}
+                              onChange={(e) => setName(e.target.value)}
+                              required
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="signup-email">Email</Label>
+                            <Input
+                              id="signup-email"
+                              type="email"
+                              placeholder="your.email@example.com"
+                              value={email}
+                              onChange={(e) => setEmail(e.target.value)}
+                              required
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="signup-password">Password</Label>
+                            <Input
+                              id="signup-password"
+                              type="password"
+                              placeholder="••••••••"
+                              value={password}
+                              onChange={(e) => setPassword(e.target.value)}
+                              required
+                            />
+                            <p className="text-xs text-foreground/70 dark:text-white/70">
+                              Password must be at least 8 characters long and include uppercase, lowercase, 
+                              and numbers, or a special character.
+                            </p>
+                          </div>
+                          <Button
+                            type="submit"
+                            className="w-full"
+                            disabled={loading}
+                          >
+                            {loading ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Creating Account...
+                              </>
+                            ) : (
+                              "Create Account"
+                            )}
+                          </Button>
+                        </form>
+
+                        <div className="relative my-4">
+                          <div className="absolute inset-0 flex items-center">
+                            <span className="w-full border-t"></span>
+                          </div>
+                          <div className="relative flex justify-center text-xs">
+                            <span className="bg-card px-2 text-foreground/70 dark:text-white/70">
+                              or
+                            </span>
+                          </div>
                         </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="email-register">Email</Label>
-                          <Input
-                            id="email-register"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            placeholder="Enter your email"
-                            autoComplete="email"
-                            className="border border-gray-700 bg-black/40"
-                            required
-                          />
+
+                        <div className="flex justify-center">
+                          <Button
+                            variant="outline"
+                            className="w-full flex items-center justify-center gap-2"
+                            type="button"
+                            onClick={() => handleOAuthSignIn("google")}
+                            disabled={loading}
+                          >
+                            <GoogleIcon />
+                            <span>Continue with Google</span>
+                          </Button>
                         </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="password-register">Password</Label>
-                          <Input
-                            id="password-register"
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            placeholder="Create a secure password"
-                            autoComplete="new-password"
-                            className="border border-gray-700 bg-black/40"
-                            required
-                          />
-                          <p className="text-xs text-white/60">
-                            Password must be at least 8 characters with uppercase, lowercase, and numbers or special characters.
-                          </p>
-                        </div>
-                      </div>
-                      <Button
-                        type="submit"
-                        className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 transition-all"
-                        disabled={loading}
-                      >
-                        {loading ? (
-                          <span className="flex items-center">
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Creating account
-                          </span>
-                        ) : (
-                          "Create account"
-                        )}
-                      </Button>
-                    </form>
+                      </CardContent>
+                    </Card>
                   </TabsContent>
                 </Tabs>
-                <div className="relative my-6">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t border-gray-700"></span>
-                  </div>
-                  <div className="relative flex justify-center text-xs">
-                    <span className="bg-black/60 px-2 text-white/60">Or continue with</span>
-                  </div>
-                </div>
-                <div className="flex flex-col space-y-3">
-                  <Button
-                    variant="outline"
-                    onClick={() => handleOAuthSignIn("google")}
-                    className="bg-transparent border border-gray-700 hover:bg-white/10"
-                  >
-                    <svg
-                      className="mr-2 h-4 w-4"
-                      aria-hidden="true"
-                      focusable="false"
-                      data-prefix="fab"
-                      data-icon="google"
-                      role="img"
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 488 512"
-                    >
-                      <path
-                        fill="currentColor"
-                        d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"
-                      ></path>
-                    </svg>
-                    Google
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+              )}
+            </motion.div>
           </div>
-        )}
-      </main>
+        </div>
+      </div>
     </div>
   );
 }

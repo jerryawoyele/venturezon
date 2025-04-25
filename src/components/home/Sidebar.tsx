@@ -52,8 +52,8 @@ const NavItem = ({ icon, label, isActive, onClick, badgeCount = 0 }: NavItemProp
       className={cn(
         "w-full justify-start gap-3 py-6 px-4 text-base",
         isActive
-          ? "bg-primary text-white hover:bg-primary"
-          : "hover:bg-primary hover:text-white"
+          ? "bg-gray-300  dark:bg-zinc-700 dark:text-white  text-black"
+          : "hover:bg-gray-300 dark:hover:bg-zinc-700 dark:hover:text-white  hover:text-black"
       )}
       onClick={onClick}
     >
@@ -120,7 +120,7 @@ export function Sidebar({
 
   // Mobile Bottom Navigation
   const mobileNav = (
-    <nav className="fixed bottom-0 left-0 right-0 w-full bg-background border-t border-white/10 px-2 py-3 lg:hidden z-50">
+    <nav className="fixed bottom-0 left-0 right-0 w-full bg-[hsl(0,0%,93%)] dark:bg-[hsl(240,10%,12%)] border-t border-border px-2 py-3 lg:hidden z-50">
       <ul className="flex justify-around max-w-screen-xl mx-auto">
         {navItems.map((item) => (
           <li key={item.label}>
@@ -155,8 +155,8 @@ export function Sidebar({
 
   // Desktop Sidebar
   const desktopNav = (
-    <div className="hidden lg:flex flex-col fixed left-0 top-0 h-screen w-64 bg-black border-r border-white/5 z-30">
-      <div className="p-4 border-b border-white/10 mb-2">
+    <div className="hidden lg:flex flex-col fixed left-0 top-0 h-screen w-64 bg-[hsl(0,0%,93%)] dark:bg-[hsl(240,10%,12%)] border-r border-border z-30">
+      <div className="p-4 border-b border-border mb-2">
         <Link to="/" className="flex items-center space-x-2">
           <span className="font-bold text-2xl bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">Venturezon</span>
         </Link>
@@ -183,11 +183,11 @@ export function Sidebar({
         </div>
       </div>
       
-      <div className="p-2 w-full border-t border-white/10 mt-2">
+      <div className="p-2 w-full border-t border-border mt-2">
         {isAuthenticated ? (
           <Button
             variant="ghost"
-            className="justify-start gap-3 w-full py-6 px-4 hover:bg-primary hover:text-white"
+            className="justify-start gap-3 w-full py-6 px-4 dark:hover:bg-zinc-700 hover:bg-gray-300 hover:text-black dark:hover:text-white"
             onClick={handleLogoutClick}
           >
             <LogOut className="w-5 h-5" />

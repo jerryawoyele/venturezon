@@ -19,6 +19,8 @@ import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { v4 as uuidv4 } from "uuid";
 import ProfileImage from "@/components/ProfileImage";
+import { User } from "@supabase/supabase-js";
+import { Profile } from "@/types";
 
 interface CreatePostProps {
   onSubmit: (data: { text: string; image_url: string | string[]; isTextPost: boolean }) => Promise<void>;
@@ -33,8 +35,8 @@ export function CreatePost({ onSubmit, className = "" }: CreatePostProps) {
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [isTextPost, setIsTextPost] = useState(true);
   const [loading, setLoading] = useState(false);
-  const [user, setUser] = useState<any>(null);
-  const [userProfile, setUserProfile] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [userProfile, setUserProfile] = useState<Profile | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -130,7 +132,7 @@ export function CreatePost({ onSubmit, className = "" }: CreatePostProps) {
 
   return (
     <>
-      <Card className={`p-6 bg-black/60 border-white/5 ${className}`}>
+      <Card className={`p-6 bg-card border-border ${className}`}>
         <div className="flex items-center gap-3">
           <ProfileImage 
             src={userProfile?.avatar_url || user?.user_metadata?.avatar_url}
@@ -138,7 +140,7 @@ export function CreatePost({ onSubmit, className = "" }: CreatePostProps) {
             className="w-10 h-10 rounded-full"
           />
           <button
-            className="flex-1 bg-white/5 hover:bg-white/10 rounded-md px-4 py-3 text-left text-white/60 cursor-pointer"
+            className="flex-1 bg-background hover:bg-secondary rounded-md px-4 py-3 text-left text-muted-foreground cursor-pointer transition-colors"
             onClick={() => setOpen(true)}
           >
             What's happening in your business?
@@ -147,7 +149,7 @@ export function CreatePost({ onSubmit, className = "" }: CreatePostProps) {
       </Card>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-md bg-background border-white/10 max-h-[90vh] overflow-hidden">
+        <DialogContent className="sm:max-w-md bg-card border-border max-h-[90vh] overflow-hidden">
           <DialogHeader className="mb-4">
             <DialogTitle>Create Post</DialogTitle>
             <DialogDescription>
@@ -179,12 +181,12 @@ export function CreatePost({ onSubmit, className = "" }: CreatePostProps) {
                   <Label htmlFor="post-text">Text Content</Label>
                   <Textarea
                     id="post-text"
-                    className="flex w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm ring-offset-background placeholder:text-white/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none min-h-[200px]"
+                    className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none min-h-[200px]"
                     placeholder="Share your thoughts, updates, or services..."
                     value={text}
                     onChange={(e) => setText(e.target.value)}
                   />
-                  <p className="text-xs text-white/50 mt-1">This will create a text-based post.</p>
+                  <p className="text-xs text-muted-foreground mt-1">This will create a text-based post.</p>
                 </div>
               ) : (
                 <>
@@ -193,7 +195,7 @@ export function CreatePost({ onSubmit, className = "" }: CreatePostProps) {
                     <Label htmlFor="post-caption">Caption</Label>
                     <Textarea
                       id="post-caption"
-                      className="flex w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm ring-offset-background placeholder:text-white/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none min-h-[100px]"
+                      className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none min-h-[100px]"
                       placeholder="Add a caption to your images..."
                       value={text}
                       onChange={(e) => setText(e.target.value)}
@@ -237,7 +239,7 @@ export function CreatePost({ onSubmit, className = "" }: CreatePostProps) {
                       onChange={handleImageChange}
                     />
                     
-                    <p className="text-xs text-white/50 mt-1">
+                    <p className="text-xs text-muted-foreground mt-1">
                       {imagePreviews.length === 0 
                         ? "Select up to 8 images to upload" 
                         : `${imagePreviews.length} image${imagePreviews.length !== 1 ? 's' : ''} selected (${8 - imagePreviews.length} remaining)`}

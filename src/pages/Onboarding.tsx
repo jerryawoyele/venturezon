@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,8 @@ export function Onboarding() {
   const [usernameError, setUsernameError] = useState("");
   const [isCheckingUsername, setIsCheckingUsername] = useState(false);
   const [usernameTimeout, setUsernameTimeout] = useState<NodeJS.Timeout | null>(null);
+  
+  const modalContainerRef = useRef<HTMLDivElement>(null);
   
   // Check if user is authenticated
   useEffect(() => {
@@ -277,9 +279,17 @@ export function Onboarding() {
     }
   };
   
-  // Save progress when navigating between steps
+  // Save progress when navigating between steps and scroll to top
   useEffect(() => {
     saveProgress();
+    
+    // Scroll to the top of the modal when changing steps
+    if (modalContainerRef.current) {
+      modalContainerRef.current.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+      });
+    }
   }, [currentStep]);
   
   return (
@@ -310,7 +320,7 @@ export function Onboarding() {
           </div>
         </div>
         
-        <div className="bg-black/60 backdrop-blur-sm border border-white/10 rounded-lg p-8 shadow-xl">
+        <div ref={modalContainerRef} className="bg-black/60 backdrop-blur-sm border border-white/10 rounded-lg p-8 shadow-xl max-h-[70vh] overflow-y-auto">
           {/* Step 1: Username, Bio, and Profile Picture */}
           {currentStep === 1 && (
             <div className="space-y-6">

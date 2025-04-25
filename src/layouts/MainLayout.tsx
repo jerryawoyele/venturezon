@@ -110,7 +110,7 @@ export function MainLayout({
     : unreadMessages;
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-[hsl(0,0%,93%)] dark:bg-[hsl(240,10%,8%)] flex flex-col">
       {/* Desktop sidebar - remains hidden on mobile */}
       <Sidebar 
         activeTab={activeTab} 
