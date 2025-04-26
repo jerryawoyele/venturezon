@@ -80,8 +80,18 @@ export function Sidebar({
 }: SidebarProps) {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [navItems, setNavItems] = useState<typeof CUSTOMER_NAV_ITEMS>([]);
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Set the correct navigation items based on user role
+  useEffect(() => {
+    if (userRole === "business") {
+      setNavItems(BUSINESS_NAV_ITEMS);
+    } else {
+      setNavItems(CUSTOMER_NAV_ITEMS);
+    }
+  }, [userRole]);
 
   const handleNavigation = (label: string, path: string) => {
     // If not authenticated and trying to access restricted pages
@@ -90,6 +100,19 @@ export function Sidebar({
     
     if (!isAuthenticated && !publicPages.includes(path) && !isUserProfile) {
       setShowAuthModal(true);
+      return;
+    }
+    
+    // Prevent accessing role-specific routes
+    if (userRole === "customer" && path === "/services") {
+      // Customers don't have access to services page
+      navigate('/bookings');
+      setActiveTab("Bookings");
+      return;
+    } else if (userRole === "business" && path === "/bookings") {
+      // Business users should see services first
+      navigate('/services');
+      setActiveTab("Services");
       return;
     }
     
@@ -110,13 +133,6 @@ export function Sidebar({
   const handleLoginClick = () => {
     navigate("/auth");
   };
-
-  // Get navigation items based on user role
-  const getNavItems = () => {
-    return userRole === "business" ? BUSINESS_NAV_ITEMS : CUSTOMER_NAV_ITEMS;
-  };
-  
-  const navItems = getNavItems();
 
   // Mobile Bottom Navigation
   const mobileNav = (

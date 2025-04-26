@@ -382,7 +382,7 @@ export default function Discover() {
                 <div className="w-full h-16 bg-black/20 rounded-lg animate-pulse" />
                 
                 {/* Grid skeletons */}
-                <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3 gap-4">
                   {Array(12).fill(0).map((_, i) => (
                     <div key={i} className="aspect-square bg-black/20 rounded-lg animate-pulse" />
                   ))}
@@ -431,7 +431,7 @@ export default function Discover() {
                 </TabsList>
 
                 <TabsContent value="posts" className="pt-4">
-                  <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3 gap-1 xs:gap-3 md:gap-4 lg:gap-6 xs:px-0">
+                  <div className="grid grid-cols-2 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3 gap-1 xs:gap-3 md:gap-4 lg:gap-6 xs:px-0">
                     {loadingPosts ? (
                       // Post loading skeletons
                       Array(9).fill(0).map((_, i) => (
@@ -500,7 +500,7 @@ export default function Discover() {
                 </TabsContent>
 
                 <TabsContent value="services" className="pt-4">
-                  <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3 gap-1 xs:gap-3 md:gap-4 lg:gap-6">
+                  <div className="grid grid-cols-2 xs:grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-3 gap-1 xs:gap-3 md:gap-4 lg:gap-6">
                     {loadingServices ? (
                       Array(6).fill(0).map((_, index) => (
                         <Card key={index} className="overflow-hidden animate-pulse">

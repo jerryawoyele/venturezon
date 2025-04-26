@@ -83,7 +83,7 @@ export function ProfileCard({
                     <div>
                       <p 
                         ref={aboutRef}
-                        className={isTruncated && shouldTruncate ? "text-white/60 text-sm line-clamp-3" : "text-white/60 text-sm"}
+                        className={isTruncated && shouldTruncate ? "dark:text-white/60 text-black/60 text-sm line-clamp-3" : "dark:text-white/60 text-black/60 text-sm"}
                       >
                         {profile.about_business}
                       </p>

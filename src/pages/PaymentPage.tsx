@@ -13,7 +13,8 @@ import {
   Lock, 
   Info, 
   ArrowLeft,
-  DollarSign
+  DollarSign,
+  Globe
 } from "lucide-react";
 import { MainLayout } from "@/layouts/MainLayout";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,9 +22,30 @@ import { useUser } from "@/hooks/use-user";
 import { useToast } from "@/components/ui/use-toast";
 import { EscrowService } from "@/utils/escrow-service";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-// Stripe checkout URL - replace with your actual endpoint in production
+// Payment gateway endpoints - replace with your actual endpoints in production
 const STRIPE_CHECKOUT_URL = "/api/create-checkout-session";
+const PAYSTACK_CHECKOUT_URL = "/api/create-paystack-session";
+
+// Countries where Paystack is available
+const PAYSTACK_SUPPORTED_COUNTRIES = [
+  "nigeria", "ghana", "kenya", "south africa", "uganda", 
+  "tanzania", "rwanda", "mauritius", "malawi", "ethiopia"
+];
+
+// Test countries for dropdown
+const TEST_COUNTRIES = [
+  { value: "nigeria", label: "Nigeria (Paystack)" },
+  { value: "ghana", label: "Ghana (Paystack)" },
+  { value: "usa", label: "USA (Stripe)" },
+  { value: "uk", label: "UK (Stripe)" },
+  { value: "canada", label: "Canada (Stripe)" }
+];
+
+// Local storage key for saving country preference
+const COUNTRY_STORAGE_KEY = "ventureezon_test_country";
 
 export default function PaymentPage() {
   const { bookingId } = useParams<{ bookingId: string }>();
@@ -40,25 +62,76 @@ export default function PaymentPage() {
   const [escrowPayment, setEscrowPayment] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("Payments");
+  const [userCountry, setUserCountry] = useState<string | null>(null);
+  const [preferredGateway, setPreferredGateway] = useState<'stripe' | 'paystack'>('stripe');
+  const [detectingLocation, setDetectingLocation] = useState(true);
 
   // Add a useEffect to track when the user data is loaded
   useEffect(() => {
     if (user) {
       setAuthLoading(false);
+      fetchUserCountry();
     }
   }, [user]);
 
-  // Check for payment success from Stripe redirect
+  // Detect user's country
+  const fetchUserCountry = async () => {
+    setDetectingLocation(true);
+    try {
+      // Try to get country from user profile
+      const { data: profileData, error } = await supabase
+        .from('profiles')
+        .select('country')
+        .eq('id', user!.id)
+        .single();
+      
+      if (!error && profileData?.country) {
+        handleCountryDetected(profileData.country.toLowerCase());
+      } else {
+        // Default to Stripe if country detection fails
+        setPreferredGateway('stripe');
+      }
+    } catch (error) {
+      console.error("Error detecting country:", error);
+      // Default to Stripe if detection fails
+      setPreferredGateway('stripe');
+    } finally {
+      setDetectingLocation(false);
+    }
+  };
+
+  // Handle detected country
+  const handleCountryDetected = (country: string) => {
+    setUserCountry(country);
+    
+    // Set preferred gateway based on country
+    if (PAYSTACK_SUPPORTED_COUNTRIES.includes(country)) {
+      setPreferredGateway('paystack');
+    } else {
+      setPreferredGateway('stripe');
+    }
+  };
+
+  // Check for payment success from redirect
   useEffect(() => {
     const query = new URLSearchParams(location.search);
     const paymentStatus = query.get('payment_status');
+    const reference = query.get('reference'); // For Paystack
+    const source = query.get('source'); // Added to identify payment source
     
-    if (paymentStatus === 'success' && booking) {
+    if ((paymentStatus === 'success' || reference) && booking) {
+      // Set the preferred gateway based on the payment source
+      if (source === 'paystack') {
+        setPreferredGateway('paystack');
+      } else if (source === 'stripe') {
+        setPreferredGateway('stripe');
+      }
+      
       handlePaymentSuccess();
     }
   }, [location.search, booking]);
 
-  // Handle successful Stripe payment
+  // Handle successful payment
   const handlePaymentSuccess = async () => {
     if (!user || !booking || !service) {
       return;
@@ -74,7 +147,11 @@ export default function PaymentPage() {
         paymentId = escrowPayment.id;
         
         // Process the existing payment record
-        const success = await EscrowService.processPayment(paymentId);
+        const success = await EscrowService.processPayment(
+          paymentId, 
+          preferredGateway // Pass the payment gateway
+        );
+        
         if (!success) {
           throw new Error("Failed to process payment");
         }
@@ -85,7 +162,10 @@ export default function PaymentPage() {
           service.price,
           user.id,
           booking.provider_id,
-          service.id
+          service.id,
+          false, // Not external
+          undefined, // No payment ID yet
+          preferredGateway // Pass the payment gateway
         );
         
         if (!payment) {
@@ -126,6 +206,7 @@ export default function PaymentPage() {
             booking_id: booking.id,
             service_id: service.id,
             service_title: service.title,
+            payment_gateway: preferredGateway
           }),
         });
       } catch (notificationError) {
@@ -153,7 +234,7 @@ export default function PaymentPage() {
   };
 
   // Redirect to Stripe checkout
-  const redirectToStripeCheckout = () => {
+  const redirectToStripeCheckout = async () => {
     if (!user || !booking || !service) {
       toast({
         title: "Missing information",
@@ -165,24 +246,71 @@ export default function PaymentPage() {
 
     setProcessingPayment(true);
 
-    // In a real implementation, this would make a request to your backend to create a Stripe checkout session
-    // For now we'll just simulate the process
-    setTimeout(() => {
-      // This should be replaced with an actual API call in production
-      const checkoutParams = new URLSearchParams({
-        booking_id: booking.id,
-        service_id: service.id,
-        customer_id: user.id,
-        provider_id: booking.provider_id,
-        amount: calculateAmounts().total.toString(),
-        success_url: `${window.location.origin}/payment/${booking.id}?payment_status=success`,
-        cancel_url: `${window.location.origin}/payment/${booking.id}?payment_status=canceled`
+    try {
+      const amounts = calculateAmounts();
+      
+      // Call the real API endpoint
+      const response = await fetch(STRIPE_CHECKOUT_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          booking_id: booking.id,
+          service_id: service.id,
+          customer_id: user.id,
+          provider_id: service.user_id,
+          amount: amounts.total.toString(),
+          success_url: `${window.location.origin}/payment/${booking.id}?payment_status=success&source=stripe`,
+          cancel_url: `${window.location.origin}/payment/${booking.id}?payment_status=canceled&source=stripe`
+        }),
       });
 
-      // Redirect to the sample Stripe checkout page
-      // In production, replace with actual redirection to Stripe
-      window.location.href = `${STRIPE_CHECKOUT_URL}?${checkoutParams.toString()}`;
-    }, 500);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create checkout session');
+      }
+
+      const sessionData = await response.json();
+      
+      // Redirect to the Stripe hosted checkout page
+      window.location.href = sessionData.url;
+    } catch (error) {
+      console.error('Stripe checkout error:', error);
+      setProcessingPayment(false);
+      toast({
+        title: "Payment failed",
+        description: error instanceof Error ? error.message : "An error occurred during payment processing. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Redirect to Paystack checkout
+  const redirectToPaystackCheckout = () => {
+    if (!user || !booking || !service) {
+      toast({
+        title: "Missing information",
+        description: "Required information is missing. Please try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setProcessingPayment(true);
+
+    // Since the API endpoint doesn't exist yet, we'll simulate a successful payment
+    // This would be replaced with a real API call in production
+    setTimeout(() => {
+      // Simulate a successful payment response
+      const mockResponse = {
+        authorization_url: `${window.location.origin}/payment/${booking.id}?payment_status=success&reference=mock_paystack_${Date.now()}&source=paystack`,
+        reference: `paystack_${Date.now()}`
+      };
+      
+      // Redirect to the authorization URL
+      window.location.href = mockResponse.authorization_url;
+    }, 1500);
   };
 
   // Load booking details
@@ -350,7 +478,7 @@ export default function PaymentPage() {
     return { subtotal, fee, total };
   };
 
-  // Replace the payment form with a simpler card that has a "Pay with Stripe" button
+  // Render payment options form
   const renderPaymentForm = () => (
     <Card>
       <CardHeader>
@@ -370,30 +498,66 @@ export default function PaymentPage() {
         </Alert>
         
         <div className="space-y-4">
-          <div className="pt-4">
-            <Button 
-              className="w-full" 
-              disabled={processingPayment}
-              onClick={redirectToStripeCheckout}
-            >
-              {processingPayment ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Redirecting to Stripe...
-                </>
+          {detectingLocation ? (
+            <div className="text-center py-2">
+              <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
+              <span className="text-sm text-muted-foreground">Preparing payment options...</span>
+            </div>
+          ) : (
+            <>
+              {PAYSTACK_SUPPORTED_COUNTRIES.includes(userCountry || '') ? (
+                // Show only Paystack for supported countries
+                <div className="space-y-4">
+                  <Button 
+                    className="w-full bg-green-600 hover:bg-green-700" 
+                    disabled={processingPayment}
+                    onClick={redirectToPaystackCheckout}
+                  >
+                    {processingPayment ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Processing Payment...
+                      </>
+                    ) : (
+                      <>
+                        <DollarSign className="mr-2 h-4 w-4" />
+                        Pay ${calculateAmounts().total.toFixed(2)} with Paystack
+                      </>
+                    )}
+                  </Button>
+                  <div className="flex items-center justify-center text-xs text-muted-foreground gap-1">
+                    <Lock className="h-3 w-3" />
+                    Secure Payment Processing with Paystack
+                  </div>
+                </div>
               ) : (
-                <>
-                  <CreditCard className="mr-2 h-4 w-4" />
-                  Pay ${calculateAmounts().total.toFixed(2)} with Stripe
-                </>
+                // Show only Stripe for non-supported countries
+                <div className="space-y-4">
+                  <Button 
+                    className="w-full" 
+                    disabled={processingPayment}
+                    onClick={redirectToStripeCheckout}
+                  >
+                    {processingPayment ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Processing Payment...
+                      </>
+                    ) : (
+                      <>
+                        <CreditCard className="mr-2 h-4 w-4" />
+                        Pay ${calculateAmounts().total.toFixed(2)} with Stripe
+                      </>
+                    )}
+                  </Button>
+                  <div className="flex items-center justify-center text-xs text-muted-foreground gap-1">
+                    <Lock className="h-3 w-3" />
+                    Secure Payment Processing with Stripe
+                  </div>
+                </div>
               )}
-            </Button>
-          </div>
-          
-          <div className="flex items-center justify-center text-xs text-muted-foreground gap-1">
-            <Lock className="h-3 w-3" />
-            Secure Payment Processing with Stripe
-          </div>
+            </>
+          )}
         </div>
       </CardContent>
     </Card>

@@ -867,11 +867,17 @@ export function Post({
                       <Heart className="h-4 w-4 mr-2" />
                       Promote
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setEditMode(true)}>
+                    <DropdownMenuItem onClick={() => {
+                      setDropdownOpen(false);
+                      setEditMode(true);
+                    }}>
                       <Edit className="h-4 w-4 mr-2" />
                       Edit Post
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => setShowDeleteConfirm(true)}>
+                    <DropdownMenuItem onClick={() => {
+                      setDropdownOpen(false);
+                      setShowDeleteConfirm(true);
+                    }}>
                       <Trash className="h-4 w-4 mr-2" />
                       Delete Post
                     </DropdownMenuItem>
@@ -1297,11 +1303,17 @@ export function Post({
                                 <Heart className="h-4 w-4 mr-2" />
                                 Promote
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => setEditMode(true)}>
+                              <DropdownMenuItem onClick={() => {
+                                setDropdownOpen(false);
+                                setEditMode(true);
+                              }}>
                                 <Edit className="h-4 w-4 mr-2" />
                                 Edit Post
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => setShowDeleteConfirm(true)}>
+                              <DropdownMenuItem onClick={() => {
+                                setDropdownOpen(false);
+                                setShowDeleteConfirm(true);
+                              }}>
                                 <Trash className="h-4 w-4 mr-2" />
                                 Delete Post
                               </DropdownMenuItem>

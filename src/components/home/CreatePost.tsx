@@ -66,13 +66,15 @@ export function CreatePost({ onSubmit, className = "" }: CreatePostProps) {
     
     setLoading(true);
     try {
-      let imageUrl = null;
+      let imageUrl;
+      
       if (!isTextPost) {
         if (imageUrls.length > 0) {
-          imageUrl = imageUrls[0];
+          // If there are multiple images, store them as a JSON array
+          imageUrl = imageUrls.length === 1 ? imageUrls[0] : JSON.stringify(imageUrls);
         }
       } else {
-        imageUrl = text.trim();
+        imageUrl = 'text'; // Mark as text post explicitly
       }
 
       await onSubmit({

@@ -13,6 +13,11 @@ export enum EscrowStatus {
 }
 
 /**
+ * Payment gateway types
+ */
+export type PaymentGateway = 'stripe' | 'paystack' | 'external';
+
+/**
  * Interface for escrow payment details
  */
 export interface EscrowPayment {
@@ -30,20 +35,31 @@ export interface EscrowPayment {
   payment_method?: string;
   payment_id?: string;
   is_external?: boolean;
+  payment_gateway?: PaymentGateway;
+  reference?: string; // For Paystack reference
 }
 
 /**
  * Service class for handling escrow payments
  */
 export class EscrowService {
-  // Platform fee percentage
-  static PLATFORM_FEE_PERCENTAGE = 8;
+  // Platform fee percentage calculation
+  static getPlatformFeePercentage(amount: number): number {
+    if (amount >= 1000) return 1; // 1% for bookings >= $1000
+    if (amount <= 50) return 8;   // 8% for bookings <= $50
+    
+    // For amounts between $50 and $1000, calculate a sliding scale
+    // From 8% at $50 to 1% at $1000
+    const percentage = 8 - ((amount - 50) / (1000 - 50)) * (8 - 1);
+    return Math.round(percentage * 10) / 10; // Round to 1 decimal place
+  }
 
   /**
    * Calculate platform fee for a given amount
    */
   static calculatePlatformFee(amount: number): number {
-    return Math.round((amount * this.PLATFORM_FEE_PERCENTAGE / 100) * 100) / 100;
+    const feePercentage = this.getPlatformFeePercentage(amount);
+    return Math.round((amount * feePercentage / 100) * 100) / 100;
   }
 
   /**
@@ -63,14 +79,16 @@ export class EscrowService {
     providerId: string,
     serviceId: string,
     isExternal: boolean = false,
-    payment_id?: string
+    payment_id?: string,
+    paymentGateway: PaymentGateway = 'stripe',
+    reference?: string
   ): Promise<EscrowPayment | null> {
     try {
       const platformFee = this.calculatePlatformFee(amount);
       const totalAmount = this.calculateTotalAmount(amount);
 
       // Create a payment record
-      const paymentData: EscrowPayment = {
+      const paymentData: any = {
         booking_id: bookingId,
         service_id: serviceId,
         amount,
@@ -83,6 +101,15 @@ export class EscrowService {
         is_external: isExternal,
         payment_id: payment_id // Store Stripe session ID if provided
       };
+      
+      // Only add these fields if they're provided to prevent schema errors
+      if (paymentGateway) {
+        paymentData.payment_gateway = paymentGateway;
+      }
+      
+      if (reference) {
+        paymentData.reference = reference;
+      }
 
       const { data: payment, error } = await supabase
         .from('escrow_payments')
@@ -114,7 +141,11 @@ export class EscrowService {
   /**
    * Process payment for an existing escrow record
    */
-  static async processPayment(paymentId: string): Promise<boolean> {
+  static async processPayment(
+    paymentId: string,
+    paymentGateway?: PaymentGateway,
+    transactionReference?: string
+  ): Promise<boolean> {
     try {
       // Get current payment
       const { data: payment, error: fetchError } = await supabase
@@ -128,10 +159,26 @@ export class EscrowService {
         return false;
       }
 
+      // Update payment details
+      const updateData: any = { 
+        status: 'completed',
+        updated_at: new Date().toISOString()
+      };
+      
+      // Add payment gateway info if provided
+      if (paymentGateway) {
+        updateData.payment_gateway = paymentGateway;
+      }
+      
+      // Add transaction reference if provided (for Paystack)
+      if (transactionReference) {
+        updateData.reference = transactionReference;
+      }
+
       // Update payment status to completed
       const { error: updateError } = await supabase
         .from('escrow_payments')
-        .update({ status: 'completed' })
+        .update(updateData)
         .eq('id', paymentId);
 
       if (updateError) {
@@ -148,6 +195,31 @@ export class EscrowService {
       return true;
     } catch (error) {
       console.error('Error in processPayment:', error);
+      return false;
+    }
+  }
+  
+  /**
+   * Verify Paystack payment using reference
+   */
+  static async verifyPaystackPayment(reference: string): Promise<boolean> {
+    try {
+      // This would typically make a request to your backend, which would verify with Paystack API
+      // For demo purposes, we'll just return true
+      console.log(`Verifying Paystack payment with reference: ${reference}`);
+      
+      // In a real implementation, you would make an API call to verify the payment
+      // const response = await fetch('/api/verify-paystack-payment', {
+      //   method: 'POST',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify({ reference })
+      // });
+      // const result = await response.json();
+      // return result.success;
+      
+      return true;
+    } catch (error) {
+      console.error('Error verifying Paystack payment:', error);
       return false;
     }
   }

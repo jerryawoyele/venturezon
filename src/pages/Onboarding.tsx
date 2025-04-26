@@ -354,7 +354,7 @@ export function Onboarding() {
                   ) : (
                     <>
                       <p className="text-xs text-white/60">
-                        Username can only contain letters, numbers, and underscores (no spaces)
+                        Username can only contain letters, numbers, and underscores with no spaces.
                       </p>
                       {username && (
                         <p className="text-xs text-primary">

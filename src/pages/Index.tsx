@@ -221,7 +221,7 @@ export default function Index() {
             >
               <h2 className="text-3xl font-bold mb-4 text-foreground dark:text-white">Why Choose Us?</h2>
               <p className="text-foreground/70 dark:text-white/70 max-w-2xl mx-auto">
-                Markezon provides a seamless experience for finding and booking services
+                Ventureezon provides a seamless experience for finding and booking services
               </p>
             </motion.div>
             

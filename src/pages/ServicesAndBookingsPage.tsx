@@ -50,8 +50,28 @@ export default function ServicesAndBookingsPage() {
   // Determine the active page based on URL
   const [pageType, setPageType] = useState<"services" | "bookings">("services");
   
+  // State for active tab
+  const [activeTab, setActiveTab] = useState(() => {
+    // Get the tab from URL or localStorage
+    const params = new URLSearchParams(location.search);
+    const tabParam = params.get("tab");
+    const savedTab = localStorage.getItem("servicesBookingsTab");
+    
+    // First try URL parameter, then localStorage, then default to "Services"
+    return tabParam || savedTab || "Services";
+  });
+  
+  // Update localStorage and URL when tab changes
+  useEffect(() => {
+    localStorage.setItem("servicesBookingsTab", activeTab);
+    
+    // Update URL without full navigation
+    const url = new URL(window.location.href);
+    url.searchParams.set("tab", activeTab);
+    window.history.replaceState({}, "", url.toString());
+  }, [activeTab]);
+  
   // Common state variables
-  const [activeTab, setActiveTab] = useState("");
   const [userRole, setUserRole] = useState<"business" | "customer" | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");

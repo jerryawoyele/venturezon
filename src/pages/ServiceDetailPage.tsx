@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { useUser } from "@/hooks/use-user";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -21,7 +21,8 @@ import {
   Calendar as CalendarIcon,
   Shield,
   MoreVertical,
-  Trash
+  Trash,
+  AlertTriangle
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -30,10 +31,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ServiceBookingForm } from "@/components/services/ServiceBookingForm";
+import { MultiStepBookingModal } from "@/components/services/MultiStepBookingModal";
 import { LocationService } from "@/utils/location-service";
 import { MainLayout } from "@/layouts/MainLayout";
 import { EscrowService } from "@/utils/escrow-service";
 import { DeleteServiceModal } from "@/components/services/DeleteServiceModal";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function ServiceDetailPage() {
   const { serviceId } = useParams<{ serviceId: string }>();
@@ -55,6 +58,7 @@ export default function ServiceDetailPage() {
   const [loadingBookings, setLoadingBookings] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [optionsDropdownOpen, setOptionsDropdownOpen] = useState(false);
+  const [showBookingModal, setShowBookingModal] = useState(false);
 
   useEffect(() => {
     checkAuthAndFetchUserRole();
@@ -246,6 +250,29 @@ export default function ServiceDetailPage() {
   const handleBookingSuccess = () => {
     setActiveTab("about");
     fetchServiceData(); // Refresh data
+  };
+
+  const handleOpenBookingModal = () => {
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to book this service",
+        variant: "destructive",
+      });
+      navigate("/auth");
+      return;
+    }
+    
+    if (userRole === "business") {
+      toast({
+        title: "Booking not allowed",
+        description: "Business accounts cannot book services. Please use a customer account.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setShowBookingModal(true);
   };
 
   // Add function to fetch service bookings
@@ -1082,53 +1109,94 @@ export default function ServiceDetailPage() {
                 </Card>
               ) : (
                 <div className="sticky top-6">
-                  <ServiceBookingForm
-                    service={service}
-                    onBookingSuccess={handleBookingSuccess}
-                  />
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Book this Service</CardTitle>
+                      <CardDescription>Fill out the form below to request a booking</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {!service ? (
+                        <div className="animate-pulse h-36"></div>
+                      ) : (
+                        <div>
+                          {/* Service Price Information */}
+                          <div className="mb-6">
+                            <div className="flex items-center space-x-2 p-3 border rounded-md bg-muted/20">
+                              <div className="h-10 w-10 rounded-md overflow-hidden bg-muted">
+                                {service.image ? (
+                                  <img
+                                    src={service.image}
+                                    alt={service.title}
+                                    className="h-full w-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="h-full w-full flex items-center justify-center bg-primary/10 text-primary font-bold">
+                                    {service.title.charAt(0).toUpperCase()}
+                                  </div>
+                                )}
+                              </div>
+                              <div>
+                                <h3 className="font-medium">{service.title}</h3>
+                                <div className="flex items-center text-sm text-muted-foreground">
+                                  <DollarSign className="h-3 w-3 mr-1" />
+                                  ${service.price}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {/* Provider Verification Alert */}
+                          {provider && !provider?.is_verified && (
+                            <Alert className="mb-5">
+                              <AlertTriangle className="h-4 w-4" />
+                              <AlertTitle>Provider Not Verified</AlertTitle>
+                              <AlertDescription>
+                                This service provider hasn't completed identity verification yet. You can still book their service, but we recommend choosing verified providers for added security.
+                              </AlertDescription>
+                            </Alert>
+                          )}
+                          
+                          <Button 
+                            type="button" 
+                            className="w-full"
+                            onClick={handleOpenBookingModal}
+                          >
+                            Book Now
+                          </Button>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
                 </div>
               )
             ) : (
-              user ? (
+              // Show if user is the service owner
+              <div className="sticky top-6">
                 <Card>
                   <CardContent className="p-6 text-center">
-                    <Shield className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                    <h3 className="text-lg font-semibold mb-2">This is your service</h3>
+                    <User className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                    <h3 className="text-lg font-semibold mb-2">You Own This Service</h3>
                     <p className="text-muted-foreground mb-4">
-                      You can't book your own service. You can manage your bookings from your dashboard.
+                      You cannot book your own service. You can edit or manage this service from your dashboard.
                     </p>
                     <Button
                       className="w-full"
-                      onClick={() => navigate("/services?tab=dashboard")}
+                      onClick={() => setActiveTab("bookings")}
                     >
-                      Go to Dashboard
+                      View Bookings
                     </Button>
                   </CardContent>
                 </Card>
-              ) : (
-                <Card>
-                  <CardContent className="p-6 text-center">
-                    <h3 className="text-lg font-semibold mb-2">Ready to book this service?</h3>
-                    <p className="text-muted-foreground mb-4">
-                      Please log in or sign up to book this service and access all features.
-                    </p>
-                    <Button
-                      className="w-full mb-2"
-                      onClick={() => navigate("/auth")}
-                    >
-                      Log In
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="w-full"
-                      onClick={() => navigate("/auth")}
-                    >
-                      Sign Up
-                    </Button>
-                  </CardContent>
-                </Card>
-              )
+              </div>
             )}
+            
+            {/* Multi-step Booking Modal */}
+            <MultiStepBookingModal
+              isOpen={showBookingModal}
+              onClose={() => setShowBookingModal(false)}
+              currentService={service}
+              providerId={service?.owner_id || ''}
+            />
           </div>
         </div>
       </div>

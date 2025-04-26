@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { OfflineAlert } from "@/components/OfflineAlert";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { AuthProvider } from "@/contexts/AuthContext";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Home from "./pages/Home";
@@ -24,9 +25,18 @@ import Settings from "./pages/Settings";
 import ServicesAndBookingsPage from "./pages/ServicesAndBookingsPage";
 import BookingDetailsPage from "./pages/BookingDetailsPage";
 import PaymentPage from "./pages/PaymentPage";
+import EmailConfirmation from "./pages/EmailConfirmation";
 import { Analytics } from "@vercel/analytics/react";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false, // Prevents refetching data when window regains focus
+      staleTime: 1000 * 60 * 5, // Data is fresh for 5 minutes
+      gcTime: 1000 * 60 * 30, // Cache is kept for 30 minutes (previously cacheTime)
+    },
+  },
+});
 
 const App = () => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -51,49 +61,52 @@ const App = () => {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <TooltipProvider>
-          <NotificationProvider>
-            <Toaster />
-            <Sonner />
-            <Analytics />
+      <AuthProvider>
+        <ThemeProvider>
+          <TooltipProvider>
+            <NotificationProvider>
+              <Toaster />
+              <Sonner />
+              <Analytics />
 
-            <BrowserRouter>
-              <Routes>
-                <Route path="/" element={<Index />} />
-                <Route path="/auth" element={<Auth />} />
-                <Route path="/home" element={<Home />} />
-                <Route path="/discover" element={<Discover />} />
-                <Route path="/messages" element={<Messages />} />
-                <Route path="/notifications" element={<Notifications />} />
-                <Route path="/profile" element={<Profile />} />
-                <Route path="/settings" element={<Settings />} />
-                <Route path="/:username" element={<UserProfile />} />
-                <Route path="/:username/:postId" element={<UserProfile />} />
-                <Route path="/user/:userId" element={<UserProfile />} />
-                <Route path="/user/:userId/:postId" element={<UserProfile />} />
-                <Route path="/userprofile/:userId" element={<UserProfile />} />
-                <Route
-                  path="/userprofile/:userId/:postId"
-                  element={<UserProfile />}
-                />
-                <Route path="/auth-callback" element={<AuthCallback />} />
-                <Route path="/setup-username" element={<UsernameSetup />} />
-                <Route path="/onboarding" element={<Onboarding />} />
-                <Route path="/services" element={<ServicesAndBookingsPage />} />
-                <Route
-                  path="/services/:serviceId"
-                  element={<ServiceDetailPage />}
-                />
-                <Route path="/bookings" element={<ServicesAndBookingsPage />} />
-                <Route path="/bookings/:id" element={<BookingDetailsPage />} />
-                <Route path="/payment/:bookingId" element={<PaymentPage />} />
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </BrowserRouter>
-          </NotificationProvider>
-        </TooltipProvider>
-      </ThemeProvider>
+              <BrowserRouter>
+                <Routes>
+                  <Route path="/" element={<Index />} />
+                  <Route path="/auth" element={<Auth />} />
+                  <Route path="/email-confirmation" element={<EmailConfirmation />} />
+                  <Route path="/home" element={<Home />} />
+                  <Route path="/discover" element={<Discover />} />
+                  <Route path="/messages" element={<Messages />} />
+                  <Route path="/notifications" element={<Notifications />} />
+                  <Route path="/profile" element={<Profile />} />
+                  <Route path="/settings" element={<Settings />} />
+                  <Route path="/:username" element={<UserProfile />} />
+                  <Route path="/:username/:postId" element={<UserProfile />} />
+                  <Route path="/user/:userId" element={<UserProfile />} />
+                  <Route path="/user/:userId/:postId" element={<UserProfile />} />
+                  <Route path="/userprofile/:userId" element={<UserProfile />} />
+                  <Route
+                    path="/userprofile/:userId/:postId"
+                    element={<UserProfile />}
+                  />
+                  <Route path="/auth-callback" element={<AuthCallback />} />
+                  <Route path="/setup-username" element={<UsernameSetup />} />
+                  <Route path="/onboarding" element={<Onboarding />} />
+                  <Route path="/services" element={<ServicesAndBookingsPage />} />
+                  <Route
+                    path="/services/:serviceId"
+                    element={<ServiceDetailPage />}
+                  />
+                  <Route path="/bookings" element={<ServicesAndBookingsPage />} />
+                  <Route path="/bookings/:id" element={<BookingDetailsPage />} />
+                  <Route path="/payment/:bookingId" element={<PaymentPage />} />
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </BrowserRouter>
+            </NotificationProvider>
+          </TooltipProvider>
+        </ThemeProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 };

@@ -18,7 +18,8 @@ import { motion } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import { Check, Shield, Star } from "lucide-react";
+import { Check, Shield, Star, Eye, EyeOff, CheckCircle2, XCircle } from "lucide-react";
+import { debounce } from "@/utils/lodashUtils";
 
 const GoogleIcon = () => (
   <svg
@@ -62,35 +63,89 @@ export default function Auth() {
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [resetPassword, setResetPassword] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [emailAvailable, setEmailAvailable] = useState<boolean | null>(null);
+  const [emailCheckLoading, setEmailCheckLoading] = useState(false);
+  const [passwordCriteria, setPasswordCriteria] = useState({
+    length: false,
+    hasUpperCase: false,
+    hasLowerCase: false,
+    hasNumbers: false,
+    hasSpecialChar: false,
+  });
   const navigate = useNavigate();
   const { toast } = useToast();
 
   useEffect(() => {
-    const checkUser = async () => {
-      const { data } = await supabase.auth.getUser();
-      if (data.user) {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        // User is already logged in, redirect to home
         navigate("/home");
       }
     };
-    checkUser();
+    
+    checkAuth();
   }, [navigate]);
+
+  // Check email availability with debounce
+  const checkEmailAvailability = debounce(async (email: string) => {
+    if (!email || !email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+      setEmailAvailable(null);
+      return;
+    }
+
+    setEmailCheckLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('email', email)
+        .maybeSingle();
+      
+      setEmailAvailable(!data);
+    } catch (error) {
+      console.error("Error checking email:", error);
+    } finally {
+      setEmailCheckLoading(false);
+    }
+  }, 500);
+
+  // Update password criteria whenever password changes
+  useEffect(() => {
+    setPasswordCriteria({
+      length: password.length >= 8,
+      hasUpperCase: /[A-Z]/.test(password),
+      hasLowerCase: /[a-z]/.test(password),
+      hasNumbers: /\d/.test(password),
+      hasSpecialChar: /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]+/.test(password),
+    });
+  }, [password]);
+
+  // Check email availability when email changes
+  useEffect(() => {
+    if (email) {
+      checkEmailAvailability(email);
+    } else {
+      setEmailAvailable(null);
+    }
+    return () => {
+      checkEmailAvailability.cancel();
+    };
+  }, [email]);
+
+  // Check if password meets requirements
+  const passwordMeetsRequirements = () => {
+    return passwordCriteria.length && 
+           ((passwordCriteria.hasUpperCase && passwordCriteria.hasLowerCase && passwordCriteria.hasNumbers) || 
+            passwordCriteria.hasSpecialChar);
+  };
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      // Validate name
-      if (!name.trim()) {
-        toast({
-          title: "Name required",
-          description: "Please enter your name.",
-          variant: "destructive",
-        });
-        setLoading(false);
-        return;
-      }
-
       // First validate email format
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(email)) {
@@ -140,11 +195,6 @@ export default function Auth() {
       const { error } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          data: {
-            name,
-          },
-        },
       });
 
       // Handle specific error for existing user
@@ -168,10 +218,9 @@ export default function Auth() {
         return;
       }
 
-      toast({
-        title: "Success!",
-        description: "Check your email for the confirmation link.",
-      });
+      // Navigate to email confirmation page instead of just showing a toast
+      navigate("/email-confirmation", { state: { email } });
+      
     } catch (error) {
       toast({
         title: "Error",
@@ -303,9 +352,6 @@ export default function Auth() {
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-background via-background to-background dark:from-black dark:via-gray-900 dark:to-black">
       <div className="container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex-1 flex flex-col py-10">
         <div className="flex justify-between items-center mb-8">
-          <Link to="/" className="flex items-center gap-2">
-            <span className="font-bold text-2xl bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-600">Venturezon</span>
-          </Link>
           
           <Link to="/" className="text-sm text-foreground/70 dark:text-white/70 hover:text-foreground dark:hover:text-white flex items-center gap-1 transition-colors">
             <ArrowLeft className="h-4 w-4" />
@@ -354,7 +400,7 @@ export default function Auth() {
                 </div>
               </div>
             </motion.div>
-          </div>
+        </div>
 
           <div className="w-full md:w-1/2 lg:w-5/12">
             <motion.div
@@ -362,41 +408,41 @@ export default function Auth() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.1 }}
             >
-              {resetPassword ? (
+        {resetPassword ? (
                 <Card className="border-border w-full">
-                  <CardHeader>
+              <CardHeader>
                     <CardTitle>Reset Password</CardTitle>
                     <CardDescription>
                       Enter your email to receive a password reset link
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <form onSubmit={handlePasswordReset} className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="email">Email</Label>
-                        <Input
-                          id="email"
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handlePasswordReset} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
                           type="email"
-                          placeholder="your.email@example.com"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          required
-                        />
-                      </div>
-                      <Button
-                        type="submit"
+                          placeholder="your.email@business.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <Button
+                    type="submit"
                         className="w-full"
-                        disabled={loading}
-                      >
-                        {loading ? (
+                    disabled={loading}
+                  >
+                    {loading ? (
                           <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                             Sending Email...
                           </>
-                        ) : (
-                          "Send Reset Link"
-                        )}
-                      </Button>
+                    ) : (
+                      "Send Reset Link"
+                    )}
+                  </Button>
                     </form>
                   </CardContent>
                   <CardFooter className="flex justify-center border-t pt-4">
@@ -404,7 +450,7 @@ export default function Auth() {
                       Back to Sign In
                     </Button>
                   </CardFooter>
-                </Card>
+            </Card>
               ) : (
                 <Tabs defaultValue="signin" className="w-full">
                   <TabsList className="grid w-full grid-cols-2 mb-4">
@@ -422,53 +468,68 @@ export default function Auth() {
                       </CardHeader>
                       <CardContent className="space-y-4">
                         <form onSubmit={handleSignIn} className="space-y-4">
-                          <div className="space-y-2">
+                        <div className="space-y-2">
                             <Label htmlFor="signin-email">Email</Label>
-                            <Input
+                          <Input
                               id="signin-email"
                               type="email"
-                              placeholder="your.email@example.com"
-                              value={email}
-                              onChange={(e) => setEmail(e.target.value)}
-                              required
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between">
+                              placeholder="your.email@business.com"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            required
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
                               <Label htmlFor="signin-password">Password</Label>
-                              <Button
-                                variant="link"
+                            <Button
+                              variant="link"
                                 className="p-0 h-auto text-xs"
                                 onClick={() => setResetPassword(true)}
-                                type="button"
-                              >
-                                Forgot password?
-                              </Button>
-                            </div>
-                            <Input
-                              id="signin-password"
-                              type="password"
-                              placeholder="••••••••"
-                              value={password}
-                              onChange={(e) => setPassword(e.target.value)}
-                              required
-                            />
+                              type="button"
+                            >
+                              Forgot password?
+                            </Button>
                           </div>
-                          <Button
-                            type="submit"
+                            <div className="relative">
+                          <Input
+                                id="signin-password"
+                                type={showPassword ? "text" : "password"}
+                                placeholder="••••••••"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            required
+                          />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="absolute right-0 top-0 h-full px-3"
+                                onClick={() => setShowPassword(!showPassword)}
+                              >
+                                {showPassword ? (
+                                  <EyeOff className="h-4 w-4" />
+                                ) : (
+                                  <Eye className="h-4 w-4" />
+                                )}
+                              </Button>
+                        </div>
+                      </div>
+                      <Button
+                        type="submit"
                             className="w-full"
-                            disabled={loading}
-                          >
-                            {loading ? (
+                        disabled={loading}
+                      >
+                        {loading ? (
                               <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                 Signing In...
                               </>
-                            ) : (
+                        ) : (
                               "Sign In"
-                            )}
-                          </Button>
-                        </form>
+                        )}
+                      </Button>
+                    </form>
 
                         <div className="relative my-4">
                           <div className="absolute inset-0 flex items-center">
@@ -507,84 +568,140 @@ export default function Auth() {
                       </CardHeader>
                       <CardContent>
                         <form onSubmit={handleSignUp} className="space-y-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="signup-name">Full Name</Label>
-                            <Input
-                              id="signup-name"
-                              type="text"
-                              placeholder="John Doe"
-                              value={name}
-                              onChange={(e) => setName(e.target.value)}
-                              required
-                            />
-                          </div>
-                          <div className="space-y-2">
+                        <div className="space-y-2">
                             <Label htmlFor="signup-email">Email</Label>
-                            <Input
-                              id="signup-email"
-                              type="email"
-                              placeholder="your.email@example.com"
-                              value={email}
-                              onChange={(e) => setEmail(e.target.value)}
-                              required
-                            />
-                          </div>
-                          <div className="space-y-2">
+                            <div className="relative">
+                          <Input
+                                id="signup-email"
+                                type="email"
+                                placeholder="your.email@business.com"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            required
+                                className={`${
+                                  emailAvailable === true ? "border-green-500" : 
+                                  emailAvailable === false ? "border-red-500" : ""
+                                }`}
+                              />
+                              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                                {emailCheckLoading ? (
+                                  <Loader2 className="h-4 w-4 animate-spin text-foreground/70" />
+                                ) : emailAvailable === true ? (
+                                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                                ) : emailAvailable === false ? (
+                                  <XCircle className="h-4 w-4 text-red-500" />
+                                ) : null}
+                              </div>
+                            </div>
+                            {emailAvailable === false && (
+                              <p className="text-xs text-red-500">Email is already in use</p>
+                            )}
+                        </div>
+                        <div className="space-y-2">
                             <Label htmlFor="signup-password">Password</Label>
-                            <Input
-                              id="signup-password"
-                              type="password"
-                              placeholder="••••••••"
-                              value={password}
-                              onChange={(e) => setPassword(e.target.value)}
-                              required
-                            />
-                            <p className="text-xs text-foreground/70 dark:text-white/70">
-                              Password must be at least 8 characters long and include uppercase, lowercase, 
-                              and numbers, or a special character.
-                            </p>
-                          </div>
-                          <Button
-                            type="submit"
+                            <div className="relative">
+                          <Input
+                                id="signup-password"
+                                type={showPassword ? "text" : "password"}
+                                placeholder="••••••••"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            required
+                                className={`${
+                                  passwordMeetsRequirements() ? "border-green-500" : ""
+                                }`}
+                              />
+                              <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center space-x-2">
+                                {passwordMeetsRequirements() && (
+                                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                                )}
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-4 w-4 p-0"
+                                  onClick={() => setShowPassword(!showPassword)}
+                                >
+                                  {showPassword ? (
+                                    <EyeOff className="h-4 w-4" />
+                                  ) : (
+                                    <Eye className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              </div>
+                            </div>
+                            <div className="text-xs space-y-1 mt-2">
+                              <div className="flex items-center space-x-2">
+                                <div className={`h-3 w-3 rounded-full ${passwordCriteria.length ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                                <span className={passwordCriteria.length ? 'text-green-500' : 'text-foreground/70'}>
+                                  At least 8 characters
+                                </span>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <div className={`h-3 w-3 rounded-full ${
+                                  (passwordCriteria.hasUpperCase && passwordCriteria.hasLowerCase && passwordCriteria.hasNumbers) 
+                                  ? 'bg-green-500' : 'bg-gray-300'}`}>
+                                </div>
+                                <span className={
+                                  (passwordCriteria.hasUpperCase && passwordCriteria.hasLowerCase && passwordCriteria.hasNumbers) 
+                                  ? 'text-green-500' : 'text-foreground/70'
+                                }>
+                                  Uppercase, lowercase and numbers
+                                </span>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <div className={`h-3 w-3 rounded-full ${
+                                  passwordCriteria.hasSpecialChar ? 'bg-green-500' : 'bg-gray-300'}`}>
+                                </div>
+                                <span className={
+                                  passwordCriteria.hasSpecialChar ? 'text-green-500' : 'text-foreground/70'
+                                }>
+                                  Special character (e.g. !@#$%^&*)
+                                </span>
+                              </div>
+                        </div>
+                      </div>
+                      <Button
+                        type="submit"
                             className="w-full"
-                            disabled={loading}
-                          >
-                            {loading ? (
+                            disabled={loading || !emailAvailable || !passwordMeetsRequirements()}
+                      >
+                        {loading ? (
                               <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                 Creating Account...
                               </>
-                            ) : (
+                        ) : (
                               "Create Account"
-                            )}
-                          </Button>
-                        </form>
+                        )}
+                      </Button>
+                    </form>
 
                         <div className="relative my-4">
-                          <div className="absolute inset-0 flex items-center">
+                  <div className="absolute inset-0 flex items-center">
                             <span className="w-full border-t"></span>
-                          </div>
-                          <div className="relative flex justify-center text-xs">
+                  </div>
+                  <div className="relative flex justify-center text-xs">
                             <span className="bg-card px-2 text-foreground/70 dark:text-white/70">
                               or
                             </span>
-                          </div>
-                        </div>
+                  </div>
+                </div>
 
                         <div className="flex justify-center">
-                          <Button
-                            variant="outline"
+                  <Button
+                    variant="outline"
                             className="w-full flex items-center justify-center gap-2"
                             type="button"
-                            onClick={() => handleOAuthSignIn("google")}
+                    onClick={() => handleOAuthSignIn("google")}
                             disabled={loading}
                           >
                             <GoogleIcon />
                             <span>Continue with Google</span>
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
                   </TabsContent>
                 </Tabs>
               )}

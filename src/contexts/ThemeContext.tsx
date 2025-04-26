@@ -21,6 +21,47 @@ const initialState: ThemeProviderState = {
 
 const ThemeProviderContext = createContext<ThemeProviderState>(initialState);
 
+// Add script to head to prevent theme flash
+const themeScript = `
+  (function() {
+    // Try to get theme from localStorage
+    const storedTheme = localStorage.getItem("ui-theme");
+    
+    // Apply the theme
+    function setTheme(theme) {
+      document.documentElement.classList.remove('light', 'dark');
+      
+      if (theme === "system" || !theme) {
+        const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+        document.documentElement.classList.add(systemTheme);
+      } else {
+        document.documentElement.classList.add(theme);
+      }
+    }
+    
+    // First check localStorage
+    if (storedTheme) {
+      setTheme(storedTheme);
+    } else {
+      // Default to system if no stored preference
+      setTheme("system");
+    }
+  })();
+`;
+
+// Create and inject script to document head on initial load
+if (typeof window !== 'undefined') {
+  const createThemeScript = () => {
+    if (!document.getElementById('theme-script')) {
+      const script = document.createElement('script');
+      script.id = 'theme-script';
+      script.innerHTML = themeScript;
+      document.head.appendChild(script);
+    }
+  };
+  createThemeScript();
+}
+
 export function ThemeProvider({
   children,
   defaultTheme = "system",
@@ -39,14 +80,9 @@ export function ThemeProvider({
         const isUserAuthenticated = !!session;
         setIsAuthenticated(isUserAuthenticated);
 
-        // Only apply stored theme for authenticated users
-        if (isUserAuthenticated) {
-          const storedTheme = localStorage.getItem(storageKey) as Theme;
-          setTheme(storedTheme || defaultTheme);
-        } else {
-          // For unauthenticated users, always use system theme
-          setTheme("system");
-        }
+        // Get stored theme preference for all users
+        const storedTheme = localStorage.getItem(storageKey) as Theme;
+        setTheme(storedTheme || defaultTheme);
         
         setIsInitialized(true);
       } catch (error) {
@@ -64,11 +100,8 @@ export function ThemeProvider({
       const isUserAuthenticated = !!session;
       setIsAuthenticated(isUserAuthenticated);
       
-      if (!isUserAuthenticated) {
-        // Reset to system theme when user logs out
-        setTheme("system");
-      } else if (isUserAuthenticated && !isInitialized) {
-        // Apply stored theme when user logs in
+      if (!isUserAuthenticated && !isInitialized) {
+        // Don't reset theme on logout, keep user preference
         const storedTheme = localStorage.getItem(storageKey) as Theme;
         setTheme(storedTheme || defaultTheme);
       }
@@ -117,10 +150,8 @@ export function ThemeProvider({
   const value = {
     theme,
     setTheme: (newTheme: Theme) => {
-      // Only store theme preference for authenticated users
-      if (isAuthenticated) {
-        localStorage.setItem(storageKey, newTheme);
-      }
+      // Store theme preference for all users, not just authenticated ones
+      localStorage.setItem(storageKey, newTheme);
       setTheme(newTheme);
     },
   };

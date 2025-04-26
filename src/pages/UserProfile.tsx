@@ -67,7 +67,7 @@ const AboutBusinessSection = ({ content }) => {
         <p 
           ref={contentRef}
           className={cn(
-            "text-white/80 whitespace-pre-wrap",
+            "dark:text-white/60 text-black/60 whitespace-pre-wrap",
             shouldTruncate && "line-clamp-4"
           )}
         >
@@ -91,7 +91,7 @@ const AboutBusinessSection = ({ content }) => {
             <DialogTitle>About the Business</DialogTitle>
           </DialogHeader>
           <div className="max-h-[60vh] overflow-y-auto mt-4">
-            <p className="whitespace-pre-wrap text-white/80">
+            <p className="whitespace-pre-wrap dark:text-white/60 text-black/60">
               {content}
             </p>
           </div>

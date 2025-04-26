@@ -82,7 +82,7 @@ export function MobileHeader({
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
           <Input
             placeholder="Search..."
-            className="pl-9 max-md:w-[200px] md:[320px] pr-8 bg-background border-input focus:border-ring transition-colors"
+            className="pl-9 max-md:w-[160px] md:[320px] pr-8 bg-background border-input focus:border-ring transition-colors"
             value={searchQuery}
             onChange={handleChange}
             onKeyPress={handleSearch}
