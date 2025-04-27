@@ -37,6 +37,7 @@ import { MainLayout } from "@/layouts/MainLayout";
 import { EscrowService } from "@/utils/escrow-service";
 import { DeleteServiceModal } from "@/components/services/DeleteServiceModal";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 export default function ServiceDetailPage() {
   const { serviceId } = useParams<{ serviceId: string }>();
@@ -59,6 +60,7 @@ export default function ServiceDetailPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [optionsDropdownOpen, setOptionsDropdownOpen] = useState(false);
   const [showBookingModal, setShowBookingModal] = useState(false);
+  const { formatPrice, currency, symbol } = useCurrency();
 
   useEffect(() => {
     checkAuthAndFetchUserRole();
@@ -262,7 +264,7 @@ export default function ServiceDetailPage() {
       navigate("/auth");
       return;
     }
-    
+
     if (userRole === "business") {
       toast({
         title: "Booking not allowed",
@@ -271,7 +273,7 @@ export default function ServiceDetailPage() {
       });
       return;
     }
-    
+
     setShowBookingModal(true);
   };
 
@@ -329,20 +331,20 @@ export default function ServiceDetailPage() {
           .select("*")
           .eq("user_id", user.id)
           .single();
-          
+
         if (payoutError || !payoutAccount) {
           toast({
             title: "Payment Account Required",
             description: "You need to set up your payout account before accepting bookings. Please go to Settings > Payments to set up your account.",
             variant: "destructive",
           });
-          
+
           // Direct the user to the settings page
           navigate("/settings?tab=payments");
           return;
         }
       }
-    
+
       const { error } = await supabase
         .from("bookings")
         .update({ status: newStatus, updated_at: new Date().toISOString() })
@@ -351,10 +353,10 @@ export default function ServiceDetailPage() {
       if (error) throw error;
 
       // Update the local state
-      setBookings(prevBookings => 
-        prevBookings.map(booking => 
-          booking.id === bookingId 
-            ? { ...booking, status: newStatus } 
+      setBookings(prevBookings =>
+        prevBookings.map(booking =>
+          booking.id === bookingId
+            ? { ...booking, status: newStatus }
             : booking
         )
       );
@@ -595,8 +597,8 @@ export default function ServiceDetailPage() {
               <div className="flex items-start justify-between mb-3">
                 <h1 className="text-3xl font-bold">{service.title}</h1>
                 <div className="flex items-center text-lg font-semibold">
-                  <DollarSign className="h-5 w-5 text-primary" />
-                  <span>{service.price}</span>
+                  <span className="mr-1 text-primary">{symbol}</span>
+                  <span>{formatPrice(service.price, 'USD')}</span>
                 </div>
               </div>
 
@@ -642,7 +644,7 @@ export default function ServiceDetailPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
 
-                  <Card 
+                  <Card
                     className="cursor-pointer hover:shadow-md transition-shadow"
                     onClick={() => navigate(`/user/${provider?.id}`)}
                   >
@@ -650,10 +652,16 @@ export default function ServiceDetailPage() {
                       <div className="p-2 bg-primary/10 rounded-full">
                         <Users className="h-5 w-5 text-primary" />
                       </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Provider</p>
-                        <p className="font-medium">{provider?.username || "Unknown"}</p>
+                      <div className="flex flex-col w-full">
+                        <div>
+                          <p className="text-sm text-muted-foreground">Provider</p>
+                          <p className="font-medium">{provider?.username || "Unknown"}</p>
+                        </div>
+                        <div className="flex justify-start">
+                        <button onClick={() => navigate(`/user/${provider?.id}`)} className="bg-primary shadow-sm mt-2 font-semibold text-sm py-1 px-2 w-fit rounded-sm flex align-end">Visit profile</button>
+                        </div>
                       </div>
+
                     </CardContent>
                   </Card>
                   <Card>
@@ -756,8 +764,8 @@ export default function ServiceDetailPage() {
                             <Star
                               key={star}
                               className={`h-5 w-5 ${star <= (service.ratings_sum / service.ratings_count)
-                                  ? "text-amber-500 fill-amber-500"
-                                  : "text-gray-300"
+                                ? "text-amber-500 fill-amber-500"
+                                : "text-gray-300"
                                 }`}
                             />
                           ))}
@@ -804,8 +812,8 @@ export default function ServiceDetailPage() {
                                   <Star
                                     key={star}
                                     className={`h-4 w-4 ${star <= review.rating
-                                        ? "text-amber-500 fill-amber-500"
-                                        : "text-gray-300"
+                                      ? "text-amber-500 fill-amber-500"
+                                      : "text-gray-300"
                                       }`}
                                   />
                                 ))}
@@ -824,15 +832,19 @@ export default function ServiceDetailPage() {
                 {provider ? (
                   <div className="space-y-6">
                     <div className="flex items-center gap-4">
-                      <Avatar className="h-16 w-16">
-                        <AvatarImage src={provider.avatar_url} />
-                        <AvatarFallback className="text-xl">
-                          {provider.username?.charAt(0).toUpperCase() || "?"}
-                        </AvatarFallback>
-                      </Avatar>
+                      <button>
+                        <Avatar onClick={() => navigate(`/user/${provider?.id}`)} className="h-16 w-16 pointer">
+                          <AvatarImage src={provider.avatar_url} />
+                          <AvatarFallback className="text-xl">
+                            {provider.username?.charAt(0).toUpperCase() || "?"}
+                          </AvatarFallback>
+                        </Avatar>
+                      </button>
                       <div>
                         <div className="flex items-center gap-2">
-                          <h2 className="text-xl font-semibold">{provider.username}</h2>
+                          <button>
+                            <h2 className="text-xl font-semibold pointer">{provider.username}</h2>
+                          </button>
                           {provider.kyc_verified ? (
                             <Badge className="bg-green-100 text-green-800 flex items-center gap-1">
                               <Shield className="h-3 w-3" />
@@ -1048,8 +1060,8 @@ export default function ServiceDetailPage() {
                                     )}
                                     {booking.escrow_payments?.[0] && (
                                       <div className="flex items-center gap-1">
-                                        <DollarSign className="h-4 w-4 text-muted-foreground" />
-                                        <span>Amount: ${booking.escrow_payments[0].amount}</span>
+                                        <span className="mr-1">{symbol}</span>
+                                        <span>Amount: {formatPrice(booking.escrow_payments[0].amount, 'USD')}</span>
                                       </div>
                                     )}
                                   </>
@@ -1138,13 +1150,13 @@ export default function ServiceDetailPage() {
                               <div>
                                 <h3 className="font-medium">{service.title}</h3>
                                 <div className="flex items-center text-sm text-muted-foreground">
-                                  <DollarSign className="h-3 w-3 mr-1" />
-                                  ${service.price}
+                                  <span className="mr-1">{symbol}</span>
+                                  {formatPrice(service.price, 'USD')}
                                 </div>
                               </div>
                             </div>
                           </div>
-                          
+
                           {/* Provider Verification Alert */}
                           {provider && !provider?.is_verified && (
                             <Alert className="mb-5">
@@ -1155,9 +1167,9 @@ export default function ServiceDetailPage() {
                               </AlertDescription>
                             </Alert>
                           )}
-                          
-                          <Button 
-                            type="button" 
+
+                          <Button
+                            type="button"
                             className="w-full"
                             onClick={handleOpenBookingModal}
                           >
@@ -1189,7 +1201,7 @@ export default function ServiceDetailPage() {
                 </Card>
               </div>
             )}
-            
+
             {/* Multi-step Booking Modal */}
             <MultiStepBookingModal
               isOpen={showBookingModal}

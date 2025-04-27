@@ -3,7 +3,7 @@ import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 import { formatPrice } from "@/lib/utils";
-import { Clock, MapPin, MoreVertical } from "lucide-react";
+import { Clock, MapPin, MoreVertical, Star } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { DeleteServiceModal } from "./DeleteServiceModal";
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 interface ServiceCardProps {
   service: {
@@ -39,6 +40,7 @@ export function ServiceCard({ service, showOptions = false, onDelete, refreshSer
   const { toast } = useToast();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const { formatPrice } = useCurrency();
   
   const getCategoryColor = (category: string) => {
     const colors: Record<string, string> = {
@@ -139,7 +141,7 @@ export function ServiceCard({ service, showOptions = false, onDelete, refreshSer
             <Badge className={`${getCategoryColor(service.category)} text-white`}>
               {service.category.charAt(0).toUpperCase() + service.category.slice(1)}
             </Badge>
-            <span className="font-semibold text-lg">{formatPrice(service.price)}</span>
+            <span className="font-semibold text-lg">{formatPrice(service.price, 'USD')}</span>
           </div>
           <h3 className="font-bold text-xl mb-2 line-clamp-1">{service.title}</h3>
           <p className="text-gray-500 dark:text-gray-400 mb-4 text-sm line-clamp-2">

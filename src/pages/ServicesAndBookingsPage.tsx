@@ -40,12 +40,29 @@ import { LocationService } from "@/utils/location-service";
 import { MainLayout } from "@/layouts/MainLayout";
 import { ServiceDashboard } from "@/components/services/ServiceDashboard";
 import { AddServiceModal } from "@/components/services/AddServiceModal";
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 export default function ServicesAndBookingsPage() {
   const location = useLocation();
   const { user } = useUser();
   const { toast } = useToast();
   const navigate = useNavigate();
+  
+  // Add a try/catch block to safely handle context issues
+  const currencyContext = (() => {
+    try {
+      return useCurrency();
+    } catch (error) {
+      // Return a fallback object with the same structure
+      return { 
+        formatPrice: (price: number) => `$${price}`, 
+        symbol: '$',
+        // Add any other properties that your code might use
+      };
+    }
+  })();
+  
+  const { formatPrice, symbol } = currencyContext;
   
   // Determine the active page based on URL
   const [pageType, setPageType] = useState<"services" | "bookings">("services");
@@ -273,7 +290,7 @@ export default function ServicesAndBookingsPage() {
   };
 
   const applyBookingsFilters = () => {
-    if (!bookings) return [];
+    if (!bookings || !Array.isArray(bookings) || bookings.length === 0) return [];
     
     let filtered = [...bookings];
     
@@ -281,19 +298,19 @@ export default function ServicesAndBookingsPage() {
     filtered = filtered.filter(booking => {
       // Show pending_completion bookings in the confirmed tab
       if (statusTab === "confirmed") {
-        return booking.status === "confirmed" || booking.status === "pending_completion";
+        return booking?.status === "confirmed" || booking?.status === "pending_completion";
       }
       // Otherwise, use exact status match
-      return booking.status === statusTab;
+      return booking?.status === statusTab;
     });
     
     // Apply search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(booking => 
-        booking.services?.title?.toLowerCase().includes(query) ||
-        booking.services?.description?.toLowerCase().includes(query) ||
-        booking.provider?.username?.toLowerCase().includes(query)
+        (booking?.services?.title?.toLowerCase() || '').includes(query) ||
+        (booking?.services?.description?.toLowerCase() || '').includes(query) ||
+        (booking?.provider?.username?.toLowerCase() || '').includes(query)
       );
     }
     
@@ -865,8 +882,8 @@ export default function ServicesAndBookingsPage() {
                       </div>
                       
                       <div className="flex items-center gap-1 text-sm">
-                        <DollarSign className="h-3 w-3 text-muted-foreground" />
-                        <span>${booking.services?.price}</span>
+                        <span className="text-muted-foreground">{symbol}</span>
+                        <span>{formatPrice(booking.services?.price, 'USD')}</span>
                       </div>
                     </div>
                     

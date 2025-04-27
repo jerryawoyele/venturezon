@@ -62,6 +62,9 @@ declare global {
     bio?: string;
     kyc_verified?: boolean;
     kyc_rejection_reason?: string;
+    country?: string;
+    country_code?: string;
+    preferred_currency?: string;
   }
   
   // Payment method type for easier use in components

@@ -14,6 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { createNotification } from '@/utils/notification-helper';
 import { useNavigate } from 'react-router-dom';
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 interface ServiceModalProps {
   service: ServiceType | null;
@@ -27,6 +28,7 @@ export function ServiceModal({ service, isOpen, onClose }: ServiceModalProps) {
   const [isBooking, setIsBooking] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { formatPrice } = useCurrency();
   
   const handleBookService = async () => {
     try {
@@ -159,7 +161,7 @@ export function ServiceModal({ service, isOpen, onClose }: ServiceModalProps) {
             {service.price && (
               <div>
                 <h3 className="text-xl font-semibold mb-2">Pricing</h3>
-                <p className="text-lg font-medium">${typeof service.price === 'string' ? service.price : service.price?.toFixed(2)}</p>
+                <p className="text-lg font-medium">{formatPrice(parseFloat(service.price))}</p>
               </div>
             )}
           </div>

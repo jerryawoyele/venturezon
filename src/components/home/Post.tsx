@@ -1101,14 +1101,14 @@ export function Post({
                           >
                             <Heart 
                               className={`h-3 w-3 ${
-                                commentLikes[comment.id] ? 'fill-red-500 text-red-500' : 'text-white/60'
+                                commentLikes[comment.id] ? 'fill-red-500 text-red-500' : 'text-black/60 dark:text-white/60'
                               }`} 
                             />
                           </Button>
                           
                           {isAuthenticated && currentUserObj && comment.user_id === currentUserObj.id && (
                             <button 
-                              className="flex items-center gap-1 text-xs text-white/60 hover:text-white/80" 
+                              className="flex items-center gap-1 text-xs dark:text-white/60 text-black/60 hover:text-white/80" 
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleDeleteComment(comment.id);

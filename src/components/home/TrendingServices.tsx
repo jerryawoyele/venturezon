@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { User } from "lucide-react";
 import { Package2 } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 interface TrendingService {
   id: string;
@@ -50,6 +51,7 @@ export function TrendingServices() {
   const [trendingServices, setTrendingServices] = useState<TrendingService[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { formatPrice } = useCurrency();
 
   useEffect(() => {
     fetchTrendingServices();
@@ -432,8 +434,8 @@ export function TrendingServices() {
                           <div className="text-primary font-medium">
                             {service.price 
                               ? service.is_price_range 
-                                ? `From ${formatPrice(service.price)}`
-                                : formatPrice(service.price)
+                                ? `From ${formatPrice(service.price, 'USD')}`
+                                : formatPrice(service.price, 'USD')
                               : 'Free'}
                           </div>
                           

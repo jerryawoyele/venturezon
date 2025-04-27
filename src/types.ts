@@ -23,6 +23,9 @@ export interface Profile {
   kyc_status?: string;
   kyc_provider?: string;
   kyc_reference_id?: string;
+  country?: string; // Country in lowercase format (e.g., "united states", "nigeria")
+  country_code?: string; // ISO country code (e.g., "US", "NG")
+  preferred_currency?: string; // User's preferred currency (e.g., "USD", "NGN")
   // Add other profile fields...
 }
 

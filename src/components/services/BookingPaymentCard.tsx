@@ -26,6 +26,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 interface BookingPaymentCardProps {
   booking: any;
@@ -39,6 +40,8 @@ export const BookingPaymentCard = ({ booking, onPaymentAction }: BookingPaymentC
   const [showRefundDialog, setShowRefundDialog] = useState(false);
   
   const payment = booking?.escrow_payments && booking.escrow_payments.length > 0 ? booking.escrow_payments[0] : null;
+  
+  const { formatPrice } = useCurrency();
   
   // Check if this booking has a payment
   if (!payment) {
@@ -189,16 +192,16 @@ export const BookingPaymentCard = ({ booking, onPaymentAction }: BookingPaymentC
         <div className="space-y-3 pt-2">
           <div className="flex justify-between">
             <span>Service Fee</span>
-            <span>${payment.amount.toFixed(2)}</span>
+            <span>{formatPrice(payment.amount)}</span>
           </div>
           <div className="flex justify-between">
             <span>Platform Fee (8%)</span>
-            <span>${payment.platform_fee.toFixed(2)}</span>
+            <span>{formatPrice(payment.platform_fee)}</span>
           </div>
           <Separator />
           <div className="flex justify-between font-bold">
             <span>Total</span>
-            <span>${payment.total_amount.toFixed(2)}</span>
+            <span>{formatPrice(payment.total_amount)}</span>
           </div>
           
           <div className="text-xs text-muted-foreground mt-2">

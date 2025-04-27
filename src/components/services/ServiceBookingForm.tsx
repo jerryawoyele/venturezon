@@ -19,6 +19,7 @@ import { EscrowService } from "@/utils/escrow-service";
 import { useNavigate } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 interface ServiceBookingFormProps {
   service: any;
@@ -48,6 +49,7 @@ export function ServiceBookingForm({ service, onBookingSuccess }: ServiceBooking
   const { user } = useUser();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { formatPrice, symbol } = useCurrency();
 
   // Get tomorrow as the default date to avoid any timezone issues with today
   const tomorrow = new Date();
@@ -390,8 +392,8 @@ export function ServiceBookingForm({ service, onBookingSuccess }: ServiceBooking
               <div>
                 <h3 className="font-medium">{service.title}</h3>
                 <div className="flex items-center text-sm text-muted-foreground">
-                  <DollarSign className="h-3 w-3 mr-1" />
-                  ${service.price}
+                  <span className="mr-1">{symbol}</span>
+                  {formatPrice(service.price, 'USD')}
                 </div>
               </div>
             </div>
@@ -489,7 +491,7 @@ export function ServiceBookingForm({ service, onBookingSuccess }: ServiceBooking
           <div className="py-2 px-3 bg-muted/30 rounded-md text-sm">
             <p className="font-medium mb-1">Payment Information</p>
             <p className="text-muted-foreground mb-2">
-              The price for this service is ${service.price}. 
+              The price for this service is {formatPrice(service.price, 'USD')}. 
             </p>
             <p className="text-muted-foreground">
               Currently, payments are handled directly between you and the service provider. 

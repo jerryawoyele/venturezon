@@ -14,6 +14,9 @@ export interface Profile {
   posts_count?: number;
   reviews_count?: number;
   reviews_rating?: number;
+  country?: string;
+  country_code?: string;
+  preferred_currency?: string;
 }
 
 export interface Post {

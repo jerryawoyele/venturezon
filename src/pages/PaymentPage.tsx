@@ -24,6 +24,7 @@ import { EscrowService } from "@/utils/escrow-service";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 // Payment gateway endpoints - replace with your actual endpoints in production
 const STRIPE_CHECKOUT_URL = "/api/create-checkout-session";
@@ -65,6 +66,7 @@ export default function PaymentPage() {
   const [userCountry, setUserCountry] = useState<string | null>(null);
   const [preferredGateway, setPreferredGateway] = useState<'stripe' | 'paystack'>('stripe');
   const [detectingLocation, setDetectingLocation] = useState(true);
+  const { formatPrice, symbol } = useCurrency();
 
   // Add a useEffect to track when the user data is loaded
   useEffect(() => {
@@ -520,8 +522,8 @@ export default function PaymentPage() {
                       </>
                     ) : (
                       <>
-                        <DollarSign className="mr-2 h-4 w-4" />
-                        Pay ${calculateAmounts().total.toFixed(2)} with Paystack
+                        <span className="mr-2">{symbol}</span>
+                        Pay {formatPrice(calculateAmounts().total)} with Paystack
                       </>
                     )}
                   </Button>
@@ -546,7 +548,7 @@ export default function PaymentPage() {
                     ) : (
                       <>
                         <CreditCard className="mr-2 h-4 w-4" />
-                        Pay ${calculateAmounts().total.toFixed(2)} with Stripe
+                        Pay {formatPrice(calculateAmounts().total)} with Stripe
                       </>
                     )}
                   </Button>
@@ -590,7 +592,7 @@ export default function PaymentPage() {
             </div>
             <h1 className="text-2xl font-bold mb-2">Payment Successful!</h1>
             <p className="text-muted-foreground mb-6 max-w-md">
-              Your payment of ${calculateAmounts().total} has been processed and is securely held in escrow until the service is completed.
+              Your payment of {formatPrice(calculateAmounts().total)} has been processed and is securely held in escrow until the service is completed.
             </p>
             
             <Card className="w-full max-w-md mb-6">
@@ -600,16 +602,16 @@ export default function PaymentPage() {
               <CardContent className="space-y-4">
                 <div className="flex justify-between">
                   <span>Service Fee</span>
-                  <span>${calculateAmounts().subtotal.toFixed(2)}</span>
+                  <span>{formatPrice(calculateAmounts().subtotal)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Platform Fee (8%)</span>
-                  <span>${calculateAmounts().fee.toFixed(2)}</span>
+                  <span>{formatPrice(calculateAmounts().fee)}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between font-bold">
                   <span>Total</span>
-                  <span>${calculateAmounts().total.toFixed(2)}</span>
+                  <span>{formatPrice(calculateAmounts().total)}</span>
                 </div>
               </CardContent>
               <CardFooter className="bg-muted/20 flex flex-col items-start p-4">
@@ -732,16 +734,16 @@ export default function PaymentPage() {
                 <div className="space-y-3">
                   <div className="flex justify-between">
                     <span>Service Fee</span>
-                    <span>${calculateAmounts().subtotal.toFixed(2)}</span>
+                    <span>{formatPrice(calculateAmounts().subtotal)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Platform Fee (8%)</span>
-                    <span>${calculateAmounts().fee.toFixed(2)}</span>
+                    <span>{formatPrice(calculateAmounts().fee)}</span>
                   </div>
                   <Separator />
                   <div className="flex justify-between font-bold">
                     <span>Total</span>
-                    <span>${calculateAmounts().total.toFixed(2)}</span>
+                    <span>{formatPrice(calculateAmounts().total)}</span>
                   </div>
                 </div>
               </CardContent>

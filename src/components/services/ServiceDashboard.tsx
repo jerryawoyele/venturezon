@@ -37,6 +37,8 @@ import {
 } from "lucide-react";
 import { AddServiceModal } from "./AddServiceModal";
 import { ServiceVerificationModal } from "./ServiceVerificationModal";
+import { formatPrice } from "@/lib/utils";
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 interface ServiceDashboardProps {
   services: any[];
@@ -86,6 +88,7 @@ export function ServiceDashboard({ services, loading, userRole, onRefresh }: Ser
   const [activeUserTab, setActiveUserTab] = useState("services");
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { formatPrice } = useCurrency();
 
   useEffect(() => {
     if (services.length > 0) {
@@ -103,7 +106,7 @@ export function ServiceDashboard({ services, loading, userRole, onRefresh }: Ser
     try {
       // Get all service IDs owned by this user
       const serviceIds = services.map(s => s.id);
-      
+
       if (serviceIds.length === 0) {
         setBookings([]);
         return;
@@ -119,18 +122,18 @@ export function ServiceDashboard({ services, loading, userRole, onRefresh }: Ser
         .in('service_id', serviceIds);
 
       if (error) throw error;
-      
+
       // Get customer profiles for the bookings
       const customerIds = [...new Set(data?.map(booking => booking.customer_id) || [])];
-      
+
       if (customerIds.length > 0) {
         const { data: customerProfiles, error: customersError } = await supabase
           .from('profiles')
           .select('id, username, avatar_url')
           .in('id', customerIds);
-          
+
         if (customersError) throw customersError;
-        
+
         // Enrich booking data with customer profiles
         const enrichedBookings = data?.map(booking => {
           const customer = customerProfiles?.find(profile => profile.id === booking.customer_id);
@@ -139,7 +142,7 @@ export function ServiceDashboard({ services, loading, userRole, onRefresh }: Ser
             customer
           };
         });
-        
+
         setBookings(enrichedBookings || []);
       } else {
         setBookings(data || []);
@@ -159,7 +162,7 @@ export function ServiceDashboard({ services, loading, userRole, onRefresh }: Ser
       // Get revenue data for the past 6 months
       const months = [];
       const today = new Date();
-      
+
       for (let i = 5; i >= 0; i--) {
         const month = new Date(today.getFullYear(), today.getMonth() - i, 1);
         months.push(month.toISOString());
@@ -167,7 +170,7 @@ export function ServiceDashboard({ services, loading, userRole, onRefresh }: Ser
 
       // Get all service IDs owned by this user
       const serviceIds = services.map(s => s.id);
-      
+
       if (serviceIds.length === 0) {
         setRevenueData([]);
         return;
@@ -182,20 +185,20 @@ export function ServiceDashboard({ services, loading, userRole, onRefresh }: Ser
         .gte('created_at', months[0]);
 
       if (error) throw error;
-      
+
       // Get services separately if needed
       const { data: servicesData } = await supabase
         .from('services')
         .select('*')
         .in('id', serviceIds);
-        
+
       // Get payments separately
       const bookingIds = data?.map(booking => booking.id) || [];
       const { data: paymentsData } = await supabase
         .from('escrow_payments')
         .select('*')
         .in('booking_id', bookingIds);
-      
+
       // Enrich booking data manually
       const enrichedBookings = data?.map(booking => {
         return {
@@ -211,7 +214,7 @@ export function ServiceDashboard({ services, loading, userRole, onRefresh }: Ser
         const monthlyBookings = enrichedBookings.filter(
           booking => booking.created_at >= month && booking.created_at < nextMonth
         ) || [];
-        
+
         const revenue = monthlyBookings.reduce((sum, booking) => {
           return sum + (booking.escrow_payments[0]?.amount || 0);
         }, 0);
@@ -224,7 +227,7 @@ export function ServiceDashboard({ services, loading, userRole, onRefresh }: Ser
       });
 
       setRevenueData(monthlyRevenue);
-      
+
     } catch (error) {
       console.error("Error fetching revenue data:", error);
     }
@@ -234,7 +237,7 @@ export function ServiceDashboard({ services, loading, userRole, onRefresh }: Ser
     try {
       // Get all service IDs owned by this user
       const serviceIds = services.map(s => s.id);
-      
+
       // First, fetch all bookings for your services
       const { data: bookingsData, error: bookingsError } = await supabase
         .from('bookings')
@@ -245,28 +248,28 @@ export function ServiceDashboard({ services, loading, userRole, onRefresh }: Ser
         .in('service_id', serviceIds);
 
       if (bookingsError) throw bookingsError;
-      
+
       // Gather unique customer IDs
       const customerIds = [...new Set(bookingsData?.map(b => b.customer_id) || [])];
-      
+
       if (customerIds.length === 0) {
         setCustomerData([]);
         return;
       }
-      
+
       // Now fetch customer profiles and booking counts
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
         .select('id, username, avatar_url')
         .in('id', customerIds);
-        
+
       if (profilesError) throw profilesError;
-      
+
       // Count bookings per customer
       const customerCounts = customerIds.map(customerId => {
         const count = bookingsData?.filter(b => b.customer_id === customerId).length || 0;
         const profile = profilesData?.find(p => p.id === customerId);
-        
+
         return {
           id: customerId,
           name: profile?.username || 'Anonymous',
@@ -274,7 +277,7 @@ export function ServiceDashboard({ services, loading, userRole, onRefresh }: Ser
           bookings: count
         };
       });
-      
+
       setCustomerData(customerCounts);
     } catch (error) {
       console.error("Error fetching customer data:", error);
@@ -292,12 +295,12 @@ export function ServiceDashboard({ services, loading, userRole, onRefresh }: Ser
     }, 0);
 
     // Count bookings by status
-    const activeBookings = bookings.filter(b => 
+    const activeBookings = bookings.filter(b =>
       b.status === 'confirmed' || b.status === 'pending' || b.status === 'in_progress'
     ).length;
-    
+
     const completedBookings = bookings.filter(b => b.status === 'completed').length;
-    
+
     // Calculate ratings data directly from services
     let totalRating = 0;
     let ratingCount = 0;
@@ -309,10 +312,10 @@ export function ServiceDashboard({ services, loading, userRole, onRefresh }: Ser
       }
     });
 
-    const averageRating = ratingCount > 0 ? 
-      (totalRating / ratingCount).toFixed(1) : 
+    const averageRating = ratingCount > 0 ?
+      (totalRating / ratingCount).toFixed(1) :
       "0.0";
-    
+
     setActiveBookings(activeBookings);
     setCompletedBookings(completedBookings);
     setTotalRevenue(totalRevenue);
@@ -336,7 +339,7 @@ export function ServiceDashboard({ services, loading, userRole, onRefresh }: Ser
   };
 
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
-  
+
   if (loading) {
     return (
       <div className="h-full w-full flex items-center justify-center">
@@ -372,20 +375,20 @@ export function ServiceDashboard({ services, loading, userRole, onRefresh }: Ser
         />
         <StatsCard
           title="Average Rating"
-          value={services.length > 0 ? 
+          value={services.length > 0 ?
             (() => {
               let totalRating = 0;
               let ratingCount = 0;
-              
+
               services.forEach(service => {
                 if (service.ratings_count && service.ratings_count > 0) {
                   totalRating += (service.ratings_sum || 0);
                   ratingCount += service.ratings_count;
                 }
               });
-              
+
               return ratingCount > 0 ? (totalRating / ratingCount).toFixed(1) : "0.0";
-            })() : 
+            })() :
             "0.0"
           }
           icon={<Star className="h-5 w-5 text-primary" />}
@@ -395,7 +398,128 @@ export function ServiceDashboard({ services, loading, userRole, onRefresh }: Ser
       </div>
 
       {/* Charts and Data */}
+      {/* Services and Customers Tables */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Services Management */}
+        <Card className="lg:col-span-2">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Your Services</CardTitle>
+              <CardDescription>
+                Manage your services and view bookings
+              </CardDescription>
+            </div>
+            {/* <Button onClick={handleAddService}>Add Service</Button> */}
+            <Button onClick={handleAddService}>
+              <Plus className="h-4 w-4 mr-2" />
+              <span className="hidden sm:inline">Add Service</span>
+              <span className="sm:hidden">Add</span>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {services.length === 0 ? (
+                <div className="text-center p-8 border rounded-lg border-dashed border-muted-foreground/50">
+                  <h3 className="text-lg font-semibold mb-2">No Services Yet</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Add your first service to start receiving bookings.
+                  </p>
+                  <Button onClick={handleAddService}>Add Service</Button>
+                </div>
+              ) : (
+                services.map((service) => {
+                  const serviceBookings = bookings.filter(b => b.service_id === service.id);
+                  return (
+                    <div key={service.id} className="flex flex-col sm:flex-row justify-between gap-4 border-b pb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="h-12 w-12 rounded-md overflow-hidden">
+                          <img
+                            src={service.image || "https://via.placeholder.com/150"}
+                            alt={service.title}
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                        <div>
+                          <h3 className="font-medium">{service.title}</h3>
+                          <p className="text-sm text-muted-foreground">{formatPrice(service.price)} - {service.category}</p>
+                          <div className="flex items-center text-xs gap-2 mt-1">
+                            <Badge variant="outline" className="text-xs">
+                              {serviceBookings.length} bookings
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleViewBookings(service)}
+                        >
+                          View Bookings
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Customer Management */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Top Customers</CardTitle>
+            <CardDescription>
+              View your most active customers
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {customerData.length === 0 ? (
+                <p className="text-center text-muted-foreground">No customer data yet</p>
+              ) : (
+                customerData.slice(0, 5).map((customer) => (
+                  <div key={customer.id} className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="h-10 w-10 flex-shrink-0 rounded-full overflow-hidden bg-muted">
+                        {customer.avatar ? (
+                          <img
+                            src={customer.avatar}
+                            alt={customer.name}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="h-full w-full flex items-center justify-center bg-primary/10 text-primary font-medium">
+                            {customer.name.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-medium truncate">{customer.name}</h3>
+                        <p className="text-xs text-muted-foreground">{customer.bookings} bookings</p>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-shrink-0"
+                      onClick={() => handleVerifyCustomer(customer)}
+                    >
+                      Verify
+                    </Button>
+                  </div>
+                ))
+              )}
+            </div>
+          </CardContent>
+          <CardFooter>
+            <Button variant="ghost" className="w-full">View All Customers</Button>
+          </CardFooter>
+        </Card>
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
         {/* Revenue & Bookings Chart */}
         <Card className="lg:col-span-2">
           <CardHeader>
@@ -467,7 +591,7 @@ export function ServiceDashboard({ services, loading, userRole, onRefresh }: Ser
                 <Tooltip formatter={(value, name) => [`${value} (${((value / (activeBookings + completedBookings || 1)) * 100).toFixed(0)}%)`, name]} />
               </PieChart>
             </ResponsiveContainer>
-            
+
             {/* Status Legend with Percentages */}
             <div className="flex flex-wrap gap-3 justify-center mt-2">
               <div className="flex items-center">
@@ -483,126 +607,7 @@ export function ServiceDashboard({ services, loading, userRole, onRefresh }: Ser
         </Card>
       </div>
 
-      {/* Services and Customers Tables */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Services Management */}
-        <Card className="lg:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Your Services</CardTitle>
-              <CardDescription>
-                Manage your services and view bookings
-              </CardDescription>
-            </div>
-            {/* <Button onClick={handleAddService}>Add Service</Button> */}
-            <Button onClick={handleAddService}>
-            <Plus className="h-4 w-4 mr-2" />
-            <span className="hidden sm:inline">Add Service</span>
-            <span className="sm:hidden">Add</span>
-          </Button>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {services.length === 0 ? (
-                <div className="text-center p-8 border rounded-lg border-dashed border-muted-foreground/50">
-                  <h3 className="text-lg font-semibold mb-2">No Services Yet</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    Add your first service to start receiving bookings.
-                  </p>
-                  <Button onClick={handleAddService}>Add Service</Button>
-                </div>
-              ) : (
-                services.map((service) => {
-                  const serviceBookings = bookings.filter(b => b.service_id === service.id);
-                  return (
-                    <div key={service.id} className="flex flex-col sm:flex-row justify-between gap-4 border-b pb-4">
-                      <div className="flex items-center gap-3">
-                        <div className="h-12 w-12 rounded-md overflow-hidden">
-                          <img 
-                            src={service.image || "https://via.placeholder.com/150"} 
-                            alt={service.title} 
-                            className="h-full w-full object-cover"
-                          />
-                        </div>
-                        <div>
-                          <h3 className="font-medium">{service.title}</h3>
-                          <p className="text-sm text-muted-foreground">${service.price} - {service.category}</p>
-                          <div className="flex items-center text-xs gap-2 mt-1">
-                            <Badge variant="outline" className="text-xs">
-                              {serviceBookings.length} bookings
-                            </Badge>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleViewBookings(service)}
-                        >
-                          View Bookings
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </CardContent>
-        </Card>
 
-        {/* Customer Management */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Top Customers</CardTitle>
-            <CardDescription>
-              View your most active customers
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {customerData.length === 0 ? (
-                <p className="text-center text-muted-foreground">No customer data yet</p>
-              ) : (
-                customerData.slice(0, 5).map((customer) => (
-                  <div key={customer.id} className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
-                      <div className="h-10 w-10 flex-shrink-0 rounded-full overflow-hidden bg-muted">
-                        {customer.avatar ? (
-                          <img 
-                            src={customer.avatar} 
-                            alt={customer.name} 
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <div className="h-full w-full flex items-center justify-center bg-primary/10 text-primary font-medium">
-                            {customer.name.charAt(0).toUpperCase()}
-                          </div>
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <h3 className="font-medium truncate">{customer.name}</h3>
-                        <p className="text-xs text-muted-foreground">{customer.bookings} bookings</p>
-                      </div>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="flex-shrink-0"
-                      onClick={() => handleVerifyCustomer(customer)}
-                    >
-                      Verify
-                    </Button>
-                  </div>
-                ))
-              )}
-            </div>
-          </CardContent>
-          <CardFooter>
-            <Button variant="ghost" className="w-full">View All Customers</Button>
-          </CardFooter>
-        </Card>
-      </div>
 
       {/* Modals */}
       {showServiceModal && (
@@ -612,7 +617,7 @@ export function ServiceDashboard({ services, loading, userRole, onRefresh }: Ser
           onServiceAdded={handleServiceAdded}
         />
       )}
-      
+
       {showVerificationModal && selectedCustomer && (
         <ServiceVerificationModal
           isOpen={showVerificationModal}

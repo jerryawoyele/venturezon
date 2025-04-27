@@ -19,6 +19,7 @@ import { SearchUsers } from "@/components/home/SearchUsers";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, DollarSign, Clock, Star } from "lucide-react";
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 interface Post {
   id: string;
@@ -71,6 +72,7 @@ export default function Discover() {
   const [filteredPosts, setFilteredPosts] = useState<Post[]>([]);
   const [filteredServices, setFilteredServices] = useState<Service[]>([]);
   const location = useLocation();
+  const { formatPrice } = useCurrency();
 
   // Add a ref for the scroll area
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -546,7 +548,7 @@ export default function Discover() {
                           <CardContent className="p-4">
                             <div className="flex items-start justify-between mb-2">
                               <h3 className="font-semibold text-lg">{service.title}</h3>
-                              <span className="font-medium text-primary">${service.price}</span>
+                              <span className="font-medium text-primary">{formatPrice(service.price, 'USD')}</span>
                             </div>
                             <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
                               {service.description}

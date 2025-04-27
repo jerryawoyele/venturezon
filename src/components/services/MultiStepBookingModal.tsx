@@ -36,6 +36,7 @@ import {
   DialogTitle,
   DialogDescription
 } from "@/components/ui/dialog";
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 interface MultiStepBookingModalProps {
   isOpen: boolean;
@@ -67,6 +68,7 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
   const { toast } = useToast();
   const navigate = useNavigate();
   const intentionalSubmitRef = useRef(false);
+  const { formatPrice, symbol } = useCurrency();
 
   // Get tomorrow as the default date to avoid any timezone issues with today
   const tomorrow = new Date();
@@ -432,7 +434,7 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
                           </div>
                         </div>
                         <div className="text-lg font-semibold text-primary">
-                          ${service.price}
+                          {formatPrice(service.price)}
                         </div>
                       </CardContent>
                     </Card>
@@ -448,7 +450,7 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
               </div>
               <div className="flex justify-between items-center px-1 mt-1">
                 <span className="font-medium">Total:</span>
-                <span className="text-lg font-semibold">${getTotalPrice()}</span>
+                <span className="text-lg font-semibold">{formatPrice(getTotalPrice())}</span>
               </div>
             </div>
           </div>
@@ -558,21 +560,21 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
                     .map(service => (
                       <div key={service.id} className="flex justify-between items-center">
                         <span>{service.title}</span>
-                        <span>${service.price}</span>
+                        <span>{formatPrice(service.price)}</span>
                       </div>
                     ))
                   }
                   <div className="pt-2 border-t border-border flex justify-between items-center">
                     <span>Subtotal</span>
-                    <span>${getTotalPrice().toFixed(2)}</span>
+                    <span>{formatPrice(getTotalPrice())}</span>
                   </div>
                   <div className="flex justify-between items-center text-sm text-muted-foreground">
                     <span>Platform fee ({getPlatformFeePercentage(getTotalPrice())}%)</span>
-                    <span>${getPlatformFee().toFixed(2)}</span>
+                    <span>{formatPrice(getPlatformFee())}</span>
                   </div>
                   <div className="pt-2 border-t border-border flex justify-between items-center font-medium">
                     <span>Total</span>
-                    <span>${getFinalPrice().toFixed(2)}</span>
+                    <span>{formatPrice(getFinalPrice())}</span>
                   </div>
                 </div>
               </div>
@@ -614,11 +616,11 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
               {/* Payment Information - Now displayed above the Book Now button */}
               <div className="bg-primary/5 p-4 rounded-lg space-y-2 border border-primary/20">
                 <div className="flex items-center gap-2 mb-1">
-                  <DollarSign className="h-4 w-4 text-primary" />
+                  <span className="text-primary">{symbol}</span>
                   <h3 className="font-medium">Payment Information</h3>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Total Price: <span className="font-medium">${getFinalPrice().toFixed(2)}</span>
+                  Total Price: <span className="font-medium">{formatPrice(getFinalPrice(), 'USD')}</span>
                 </p>
                 <div className="flex items-center gap-1.5 text-sm text-primary">
                   <ShieldCheck className="h-3.5 w-3.5" />

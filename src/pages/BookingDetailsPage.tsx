@@ -28,6 +28,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { CustomerConfirmationModal } from "@/components/services/CustomerConfirmationModal";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { BookingPaymentCard } from "@/components/services/BookingPaymentCard";
+import { useCurrency } from "@/contexts/CurrencyContext";
 
 export default function BookingDetailsPage() {
   const { id } = useParams();
@@ -41,6 +42,7 @@ export default function BookingDetailsPage() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [makingPayment, setMakingPayment] = useState(false);
+  const { formatPrice } = useCurrency();
 
   useEffect(() => {
     fetchBookingDetails();
@@ -321,7 +323,7 @@ export default function BookingDetailsPage() {
                   </div>
                   <div>
                     <h4 className="text-sm font-medium text-muted-foreground">Price</h4>
-                    <p className="font-medium">${booking.services?.price}</p>
+                    <p className="font-medium">{formatPrice(booking.services?.price, 'USD')}</p>
                   </div>
                 </div>
 
@@ -570,7 +572,7 @@ export default function BookingDetailsPage() {
                   </div>
                   <div className="flex justify-between">
                     <span>Price:</span>
-                    <span className="font-medium">${booking.services?.price}</span>
+                    <span className="font-medium">{formatPrice(booking.services?.price, 'USD')}</span>
                   </div>
                 </div>
               </div>
