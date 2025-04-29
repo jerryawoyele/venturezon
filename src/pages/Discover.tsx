@@ -18,7 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SearchUsers } from "@/components/home/SearchUsers";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { MapPin, DollarSign, Clock, Star } from "lucide-react";
+import { MapPin, DollarSign, Clock, Star, HeartIcon } from "lucide-react";
 import { useCurrency } from "@/contexts/CurrencyContext";
 
 interface Post {
@@ -474,7 +474,7 @@ export default function Discover() {
                                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                                 </div>
                               ) : (
-                                <div className="flex-1 p-4 flex items-center justify-center bg-background dark:bg-gradient-to-br dark:from-gray-900 dark:to-black">
+                                <div className="relative flex-1 p-4 flex items-center justify-center bg-background dark:bg-gradient-to-br dark:from-gray-900 dark:to-black">
                                   <p className="text-lg font-medium line-clamp-4 text-black dark:text-white text-center">
                                     {preview.content}
                                   </p>
@@ -546,9 +546,9 @@ export default function Discover() {
                             <Badge className="absolute top-2 right-2">{service.category}</Badge>
                           </div>
                           <CardContent className="p-4">
-                            <div className="flex items-start justify-between mb-2">
-                              <h3 className="font-semibold text-lg">{service.title}</h3>
-                              <span className="font-medium text-primary">{formatPrice(service.price, 'USD')}</span>
+                            <div className="flex flex-col xs:flex-row xs:items-start xs:justify-between mb-2">
+                              <h3 className="font-semibold text-lg mb-1 xs:mb-0">{service.title}</h3>
+                              <span className="font-medium text-primary whitespace-nowrap">{formatPrice(service.price, 'USD')}</span>
                             </div>
                             <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
                               {service.description}
@@ -556,7 +556,7 @@ export default function Discover() {
                             <div className="flex items-center justify-between text-sm">
                               <div className="flex items-center gap-1">
                                 <MapPin className="h-3 w-3" />
-                                <span>{service.location}</span>
+                                <span className="truncate max-w-[80px] xs:max-w-[120px]">{service.location}</span>
                               </div>
                               <div className="flex items-center gap-1">
                                 <Clock className="h-3 w-3" />

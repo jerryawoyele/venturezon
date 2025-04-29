@@ -634,7 +634,8 @@ export function Post({
     }
   };
 
-  const handleImageTap = () => {
+  const handleImageTap = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent card click from triggering
     const now = Date.now();
     const doubleTapDelay = 300;
     
@@ -888,7 +889,10 @@ export function Post({
           </div>
           
           {isTextPost() ? (
-            <div className="p-6 bg-background dark:bg-gradient-to-br dark:from-gray-900 dark:to-black flex items-center justify-center min-h-[200px]">
+            <div 
+              className="p-6 bg-background dark:bg-gradient-to-br dark:from-gray-900 dark:to-black flex items-center justify-center min-h-[200px]"
+              onClick={handleImageTap}
+            >
               <p className="text-lg md:text-xl font-medium text-center line-clamp-5">{captionState}</p>
             </div>
           ) : (

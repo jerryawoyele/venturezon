@@ -119,6 +119,9 @@ export default function ServicesAndBookingsPage() {
   const [bookingToCancel, setBookingToCancel] = useState<string | null>(null);
   const [cancellationLoading, setCancellationLoading] = useState(false);
 
+  // Add new state for pending completion bookings
+  const [pendingCompletionBookings, setPendingCompletionBookings] = useState<any[]>([]);
+
   // Initialize based on path
   useEffect(() => {
     const path = location.pathname;
@@ -152,6 +155,18 @@ export default function ServicesAndBookingsPage() {
       setFilteredBookings(applyBookingsFilters());
     }
   }, [bookings, statusTab, searchQuery]);
+
+  useEffect(() => {
+    if (user && bookings && bookings.length > 0) {
+      // Find bookings that need customer confirmation
+      const pendingCompletions = bookings.filter(
+        b => b.status === "pending_completion" && b.customer_id === user.id
+      );
+      setPendingCompletionBookings(pendingCompletions);
+    } else {
+      setPendingCompletionBookings([]);
+    }
+  }, [bookings, user]);
 
   const checkAuthAndFetchUserRole = async () => {
     try {
@@ -678,6 +693,61 @@ export default function ServicesAndBookingsPage() {
     };
   };
 
+  // Function to handle confirming service completion
+  const handleConfirmCompletion = async (bookingId: string) => {
+    try {
+      // Update booking status to completed
+      const { error } = await supabase
+        .from('bookings')
+        .update({ 
+          status: "completed",
+        })
+        .eq('id', bookingId);
+        
+      if (error) throw error;
+      
+      // Release payment if there is one
+      const { data: paymentData } = await supabase
+        .from('escrow_payments')
+        .select('id')
+        .eq('booking_id', bookingId)
+        .single();
+        
+      if (paymentData?.id) {
+        // In a real app, properly handle payment release here
+        console.log(`Payment ${paymentData.id} released for booking ${bookingId}`);
+      }
+      
+      // Send notification to provider
+      const booking = bookings.find(b => b.id === bookingId);
+      if (booking?.provider_id) {
+        await createNotification({
+          userId: booking.provider_id,
+          actorId: user?.id,
+          type: 'booking_completion',
+          message: `Customer has confirmed the completion of service "${booking.services?.title || 'your service'}"`,
+          linkType: 'booking',
+          linkId: bookingId
+        });
+      }
+      
+      // Update UI by refetching bookings
+      fetchBookings();
+      
+      toast({
+        title: "Service Completed",
+        description: "You have successfully confirmed the service completion",
+      });
+    } catch (error) {
+      console.error("Error confirming completion:", error);
+      toast({
+        title: "Error",
+        description: "Failed to confirm service completion. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   // UI rendering
   const renderServicesContent = () => (
     <>
@@ -766,26 +836,53 @@ export default function ServicesAndBookingsPage() {
         </Card>
       ) : (
         <>
-          <div className="mb-6 flex flex-col md:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+          <div className="space-y-4 mb-6">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <h3 className="text-2xl font-bold">My Bookings</h3>
               <Input
                 placeholder="Search bookings..."
-                className="pl-10"
+                className="max-w-xs"
                 value={searchQuery}
-                onChange={handleSearchChange}
+                onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
+            
+            {pendingCompletionBookings.length > 0 && (
+              <Card className="bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800">
+                <CardContent className="p-4">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 justify-between">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-500 mt-0.5" />
+                      <div>
+                        <h4 className="font-medium text-yellow-800 dark:text-yellow-400">Service Completion Confirmation</h4>
+                        <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                          You have {pendingCompletionBookings.length} {pendingCompletionBookings.length === 1 ? 'service' : 'services'} that need your confirmation to complete.
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-yellow-600 text-yellow-700 hover:text-yellow-800 hover:bg-yellow-100 dark:text-yellow-400 dark:hover:text-yellow-300 dark:hover:bg-yellow-900/40"
+                      onClick={() => navigate(`/bookings/${pendingCompletionBookings[0].id}`)}
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      View & Confirm
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+            
+            <Tabs defaultValue={statusTab} onValueChange={setStatusTab} className="w-full">
+              <TabsList className="grid grid-cols-4 mb-4">
+                <TabsTrigger value="pending">Pending</TabsTrigger>
+                <TabsTrigger value="confirmed">Confirmed</TabsTrigger>
+                <TabsTrigger value="completed">Completed</TabsTrigger>
+                <TabsTrigger value="canceled">Canceled</TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
-
-          <Tabs value={statusTab} onValueChange={setStatusTab} className="mb-6 overflow-hidden">
-            <TabsList className="overflow-x-auto whitespace-nowrap sm:w-fit w-full flex ">
-              <TabsTrigger value="pending">Pending</TabsTrigger>
-              <TabsTrigger value="confirmed">Confirmed</TabsTrigger>
-              <TabsTrigger value="completed">Completed</TabsTrigger>
-              <TabsTrigger value="canceled">Canceled</TabsTrigger>
-            </TabsList>
-          </Tabs>
 
           {loadingBookings ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

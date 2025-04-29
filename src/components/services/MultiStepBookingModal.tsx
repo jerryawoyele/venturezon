@@ -21,7 +21,8 @@ import {
   ArrowLeft, 
   ArrowRight,
   CheckCircle,
-  ShieldCheck 
+  ShieldCheck,
+  AlertTriangle
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useUser } from "@/hooks/use-user";
@@ -68,7 +69,7 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
   const { toast } = useToast();
   const navigate = useNavigate();
   const intentionalSubmitRef = useRef(false);
-  const { formatPrice, symbol } = useCurrency();
+  const { formatPrice, symbol, currency } = useCurrency();
 
   // Get tomorrow as the default date to avoid any timezone issues with today
   const tomorrow = new Date();
@@ -78,8 +79,8 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      date: tomorrow,
-      time: "10:00",
+      date: new Date(), // Set to current date
+      time: format(new Date(), 'HH:mm'), // Set to current time
       location: "",
       notes: "",
       serviceIds: currentService ? [currentService.id] : [],
@@ -230,8 +231,8 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
 
       // Calculate platform fee and final price
       const subtotal = getTotalPrice();
-      const platformFee = getPlatformFee();
-      const finalPrice = getFinalPrice();
+      const platformFee = getPlatformFee(subtotal);
+      const finalPrice = subtotal + platformFee;
 
       // Create booking data object first to validate
       const bookingData = {
@@ -248,8 +249,6 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
         total_price: finalPrice
       };
 
-      console.log("Submitting booking data:", bookingData);
-
       // Insert the booking
       const { data: newBooking, error: bookingError } = await supabase
         .from("bookings")
@@ -258,7 +257,6 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
         .single();
 
       if (bookingError) {
-        console.error("Booking error details:", bookingError);
         throw new Error(bookingError.message || "Failed to create booking");
       }
 
@@ -271,11 +269,14 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
         description: "Your booking is being processed. Redirecting to payment...",
       });
 
-      // Redirect to payment page with booking ID only if intentional submit
-      if (intentionalSubmitRef.current) {
-        navigate(`/payment/${newBooking.id}`);
-        onClose(); // Close the modal
-      }
+      // Close modal before redirecting
+      onClose();
+      
+      // Check if the user is in a supported country (for Paystack)
+      const userCountry = await detectUserCountry();
+      
+      // Directly redirect to payment page
+      navigate(`/payment/${newBooking.id}`);
     } catch (error: any) {
       console.error("Error creating booking:", error);
       let errorMessage = "There was an error processing your booking. Please try again.";
@@ -297,28 +298,67 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
     }
   };
 
-  const nextStep = () => {
-    // Reset intentional submit flag when moving between steps
-    intentionalSubmitRef.current = false;
+  // Function to detect user's country (simplified version - in production use proper geolocation service)
+  const detectUserCountry = async (): Promise<string> => {
+    try {
+      // In a real application, you would use a geolocation service or get from user profile
+      // For demo purposes, we'll assume Nigeria for now
+      return "NG"; // ISO country code for Nigeria
+    } catch (error) {
+      console.error("Error detecting user country:", error);
+      return "unknown";
+    }
+  };
+  
+  // Function to check if Paystack is supported in user's country
+  const isPaystackSupported = (countryCode: string): boolean => {
+    // List of countries where Paystack operates
+    const paystackSupportedCountries = ["NG", "GH", "ZA", "KE"];
+    return paystackSupportedCountries.includes(countryCode);
+  };
+  
+  // Function to initialize Paystack payment
+  const initializePaystackPayment = (bookingId: string, amount: number, email: string) => {
+    // This would be replaced with actual Paystack integration
+    console.log(`Initializing Paystack payment for booking ${bookingId} with amount ${amount}`);
     
-    // Validate the current step before proceeding
-    if (step === 1) {
-      const serviceIds = form.getValues("serviceIds");
-      if (!serviceIds || serviceIds.length === 0) {
-        toast({
-          title: "Please select a service",
-          description: "You must select at least one service to continue",
-          variant: "destructive",
+    // In a real implementation, you would use Paystack's inline JS
+    // Example code for Paystack (would be implemented properly in production):
+    /*
+    const handler = PaystackPop.setup({
+      key: 'pk_test_your_public_key',
+      email: email,
+      amount: amount * 100, // Paystack amount is in kobo (100 kobo = 1 Naira)
+      currency: 'NGN',
+      ref: bookingId + '_' + new Date().getTime(),
+      callback: function(response) {
+        // Handle successful payment
+        window.location.href = `/payment/success/${bookingId}?reference=${response.reference}`;
+      },
+      onClose: function() {
+        // Handle payment cancellation
+        window.location.href = `/payment/cancel/${bookingId}`;
+      }
+    });
+    handler.openIframe();
+    */
+  };
+
+  const nextStep = () => {
+    // If current step is 2 (scheduling), check if location is filled
+    if (step === 2) {
+      const location = form.getValues("location");
+      if (!location || location.trim() === "") {
+        form.setError("location", { 
+          type: "manual", 
+          message: "Location is required to proceed" 
         });
         return;
       }
-      setStep(2);
-    } else if (step === 2) {
-      form.trigger(["date", "time", "location"]);
-      if (form.formState.errors.date || form.formState.errors.time || form.formState.errors.location) {
-        return;
-      }
-      setStep(3);
+    }
+    
+    if (step < 4) {
+      setStep(step + 1);
     }
   };
 
@@ -331,28 +371,58 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
     }
   };
 
-  // Calculate platform fee percentage based on total price
-  const getPlatformFeePercentage = (price: number) => {
-    if (price >= 1000) return 1; // 1% for bookings >= $1000
-    if (price <= 50) return 8;   // 8% for bookings <= $50
+  // Clean implementation of fixed fee structure for platform fees
+  const getPlatformFee = (amount: number): number => {
+    // For Naira (NGN) currency
+    if (currency === 'NGN') {
+      // Fixed fee structure for Naira
+      if (amount <= 3000) return 100;
+      if (amount <= 6000) return 200;
+      if (amount <= 10000) return 300;
+      if (amount <= 20000) return 400;
+      if (amount <= 50000) return 500;
+      if (amount <= 100000) return 600;
+      if (amount <= 500000) return 800;
+      if (amount <= 1000000) return 1000;
+      if (amount <= 2000000) return 1500;
+      return 2000; // for 2 million and above
+    }
     
-    // For amounts between $50 and $1000, calculate a sliding scale
-    // From 8% at $50 to 1% at $1000
-    const percentage = 8 - ((price - 50) / (1000 - 50)) * (8 - 1);
-    return Math.round(percentage * 10) / 10; // Round to 1 decimal place
+    // For other currencies (USD, etc.)
+    if (currency === 'USD') {
+      if (amount <= 2) return 0.07;
+      if (amount <= 4) return 0.13;
+      if (amount <= 7) return 0.20;
+      if (amount <= 15) return 0.27;
+      if (amount <= 35) return 0.33;
+      if (amount <= 70) return 0.40;
+      if (amount <= 350) return 0.53;
+      if (amount <= 700) return 0.67;
+      if (amount <= 1400) return 1.00;
+      return 1.33;
+    }
+    
+    // Default fallback - use NGN structure if currency not specifically handled
+    const exchangeRates = { NGN: 1, USD: 1500 }; // Simplified rate table
+    const rate = exchangeRates[currency as keyof typeof exchangeRates] || 1;
+    const amountInNgn = amount * rate;
+    
+    if (amountInNgn <= 3000) return 100 / rate;
+    if (amountInNgn <= 6000) return 200 / rate;
+    if (amountInNgn <= 10000) return 300 / rate;
+    if (amountInNgn <= 20000) return 400 / rate;
+    if (amountInNgn <= 50000) return 500 / rate;
+    if (amountInNgn <= 100000) return 600 / rate;
+    if (amountInNgn <= 500000) return 800 / rate;
+    if (amountInNgn <= 1000000) return 1000 / rate;
+    if (amountInNgn <= 2000000) return 1500 / rate;
+    return 2000 / rate;
   };
 
-  // Calculate platform fee amount
-  const getPlatformFee = () => {
-    const totalPrice = getTotalPrice();
-    const feePercentage = getPlatformFeePercentage(totalPrice);
-    return (totalPrice * feePercentage) / 100;
-  };
-
-  // Calculate final price including platform fee
+  // Calculate final price with platform fee
   const getFinalPrice = () => {
     const totalPrice = getTotalPrice();
-    const platformFee = getPlatformFee();
+    const platformFee = getPlatformFee(totalPrice);
     return totalPrice + platformFee;
   };
 
@@ -466,40 +536,22 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="date">Date</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      id="date"
-                      variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !form.watch("date") && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {form.watch("date") ? (
-                        format(form.watch("date"), "PPP")
-                      ) : (
-                        <span>Select date</span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={form.watch("date")}
-                      onSelect={(date) => {
-                        if (date) {
-                          form.setValue("date", date, { shouldValidate: true });
-                        }
-                      }}
-                      disabled={(date) => 
-                        date < new Date(new Date().setHours(0, 0, 0, 0))
+                <div className="border rounded-md p-0">
+                  <Calendar
+                    mode="single"
+                    selected={form.watch("date")}
+                    onSelect={(date) => {
+                      if (date) {
+                        form.setValue("date", date, { shouldValidate: true });
                       }
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+                    }}
+                    disabled={(date) => 
+                      date < new Date(new Date().setHours(0, 0, 0, 0))
+                    }
+                    initialFocus
+                    className="w-full"
+                  />
+                </div>
                 {form.formState.errors.date && (
                   <p className="text-sm text-red-500">
                     {form.formState.errors.date.message as string}
@@ -515,6 +567,7 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
                     id="time"
                     type="time"
                     {...form.register("time")}
+                    className="flex-1"
                   />
                 </div>
                 {form.formState.errors.time && (
@@ -525,7 +578,7 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="location">Location</Label>
+                <Label htmlFor="location">Location <span className="text-red-500">*</span></Label>
                 <div className="flex items-center">
                   <MapPin className="h-4 w-4 mr-2 text-muted-foreground" />
                   <Input
@@ -568,10 +621,9 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
                     <span>Subtotal</span>
                     <span>{formatPrice(getTotalPrice())}</span>
                   </div>
-                  <div className="flex justify-between items-center text-sm text-muted-foreground">
-                    <span>Platform fee ({getPlatformFeePercentage(getTotalPrice())}%)</span>
-                    <span>{formatPrice(getPlatformFee())}</span>
-                  </div>
+                  
+                  {renderPlatformFeeInfo()}
+                  
                   <div className="pt-2 border-t border-border flex justify-between items-center font-medium">
                     <span>Total</span>
                     <span>{formatPrice(getFinalPrice())}</span>
@@ -629,6 +681,12 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
                 <p className="text-sm text-muted-foreground">
                   Your payment will be held in escrow until you confirm the service has been completed satisfactorily.
                 </p>
+                {!isPaystackSupported("NG") && (
+                  <div className="mt-2 text-amber-600 text-sm flex items-center gap-1">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    <span>Payment services may not be available in your country.</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -637,6 +695,19 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
       default:
         return null;
     }
+  };
+
+  // Simple helper to render platform fee info consistently
+  const renderPlatformFeeInfo = () => {
+    const totalPrice = getTotalPrice();
+    const platformFee = getPlatformFee(totalPrice);
+    
+    return (
+      <div className="flex justify-between items-center text-sm text-muted-foreground">
+        <span>Platform fee (fixed)</span>
+        <span>{formatPrice(platformFee)}</span>
+      </div>
+    );
   };
 
   return (
@@ -722,6 +793,8 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
                 className="flex items-center"
                 onClick={() => {
                   intentionalSubmitRef.current = true;
+                  // Manually trigger form submission
+                  form.handleSubmit(onSubmit)();
                 }}
               >
                 {isSubmitting ? (

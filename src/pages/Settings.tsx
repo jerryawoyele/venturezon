@@ -296,7 +296,7 @@ export default function Settings() {
     const statusParam = params.get('status');
 
     // Only set active tab if it's a valid tab value
-    if (tabParam && ["profile", "notifications", "privacy", "verification"].includes(tabParam)) {
+    if (tabParam && ["profile", "notifications", "privacy", "verification", "payments"].includes(tabParam)) {
       setActiveTab(tabParam);
     }
 
@@ -1022,10 +1022,6 @@ export default function Settings() {
               <TabsTrigger value="kyc" className="flex items-center gap-2">
                 <Briefcase size={16} />
                 <span>Business Verification</span>
-              </TabsTrigger>
-              <TabsTrigger value="developer" className="flex items-center gap-2">
-                <Info size={16} />
-                <span>Developer</span>
               </TabsTrigger>
             </TabsList>
           </div>
@@ -2066,50 +2062,6 @@ export default function Settings() {
                       </Button>
                     </div>
                   )}
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="developer" className="space-y-6">
-            <div>
-              <h3 className="text-lg font-medium mb-4">Developer Settings</h3>
-              
-              <Card>
-                <CardHeader>
-                  <CardTitle>Debug Tools</CardTitle>
-                  <CardDescription>
-                    These settings are for testing and debugging purposes only.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="space-y-4">
-                    <h4 className="font-medium">Currency Debugging</h4>
-                    <div className="space-y-2">
-                      <p className="text-sm">Current detected currency: <strong>{currency}</strong></p>
-                      
-                      <div className="grid gap-2">
-                        <Label htmlFor="debugCountry">Override Country Code</Label>
-                        <div className="flex space-x-2">
-                          <Input
-                            id="debugCountry"
-                            value={debugCountry}
-                            onChange={(e) => setDebugCountry(e.target.value.toUpperCase())}
-                            placeholder="US, NG, GB, etc."
-                            className="w-32"
-                            maxLength={2}
-                          />
-                          <Button onClick={handleCountryOverride}>
-                            Apply Override
-                          </Button>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          Enter a two-letter country code to override your detected location.
-                          Examples: US (United States), NG (Nigeria), GB (United Kingdom), etc.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
                 </CardContent>
               </Card>
             </div>
