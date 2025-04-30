@@ -556,17 +556,18 @@ export default function Discover() {
                             <div className="flex items-center justify-between text-sm">
                               <div className="flex items-center gap-1">
                                 <MapPin className="h-3 w-3" />
-                                <span className="truncate max-w-[80px] xs:max-w-[120px]">{service.location}</span>
+                                <span className="truncate max-w-[80px] xs:max-w-[120px]">{service.location? service.location: `No location`}</span>
                               </div>
                               <div className="flex items-center gap-1">
                                 <Clock className="h-3 w-3" />
-                                <span>
+                                
+                                {service.duration_minutes?<span>
                                   {service.duration_minutes < 60
                                     ? `${service.duration_minutes||''}m`
                                     : `${Math.floor(service.duration_minutes / 60)}h${
                                         service.duration_minutes % 60 ? ` ${service.duration_minutes % 60}m` : ""
                                       }`}
-                                </span>
+                                </span>:<span>No time was set</span>}
                               </div>
                             </div>
                           </CardContent>

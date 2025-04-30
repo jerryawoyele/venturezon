@@ -510,7 +510,7 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
                       date < new Date(new Date().setHours(0, 0, 0, 0))
                     }
                     initialFocus
-                    className="w-full"
+                    className="w-full flex justify-center"
                   />
                 </div>
                 {form.formState.errors.date && (
@@ -523,7 +523,6 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
               <div className="space-y-2">
                 <Label htmlFor="time">Time</Label>
                 <div className="flex items-center">
-                  <Clock className="h-4 w-4 mr-2 text-muted-foreground" />
                   <Input
                     id="time"
                     type="time"

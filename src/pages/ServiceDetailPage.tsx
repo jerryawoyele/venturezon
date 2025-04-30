@@ -702,7 +702,6 @@ export default function ServiceDetailPage() {
               <div className="flex items-start justify-between mb-3">
                 <h1 className="text-3xl font-bold">{service.title}</h1>
                 <div className="flex items-center text-lg font-semibold">
-                  <span className="mr-1 text-primary">{symbol}</span>
                   <span>{formatPrice(service.price, 'USD')}</span>
                 </div>
               </div>
@@ -710,11 +709,11 @@ export default function ServiceDetailPage() {
               <div className="flex flex-wrap gap-4 mb-6">
                 <div className="flex items-center gap-1">
                   <MapPin className="h-4 w-4 text-muted-foreground" />
-                  <span>{service.location}</span>
+                  <span>{service.location? service.location: `No location provided`}</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <Clock className="h-4 w-4 text-muted-foreground" />
-                  <span>{service.duration_minutes} minutes</span>
+                  {service.duration_minutes?<span>{service.duration_minutes} minutes</span>:<span>No time was set</span>}
                 </div>
                 {service.ratings_count > 0 && (
                   <div className="flex items-center gap-1">
@@ -1297,7 +1296,6 @@ export default function ServiceDetailPage() {
                               <div>
                                 <h3 className="font-medium">{service.title}</h3>
                                 <div className="flex items-center text-sm text-muted-foreground">
-                                  <span className="mr-1">{symbol}</span>
                                   {formatPrice(service.price, 'USD')}
                                 </div>
                               </div>

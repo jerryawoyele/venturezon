@@ -1782,7 +1782,7 @@ export default function Settings() {
                                   </Badge>
                                 )}
                                 {payoutAccount.status === "pending" && (
-                                  <Badge variant="outline" className="mt-2 bg-yellow-50">
+                                  <Badge variant="outline" className="mt-2 bg-yellow-500">
                                     <AlertCircle className="h-3 w-3 mr-1" /> Verification Pending
                                   </Badge>
                                 )}

@@ -55,7 +55,7 @@ export default function ServicesAndBookingsPage() {
     } catch (error) {
       // Return a fallback object with the same structure
       return { 
-        formatPrice: (price: number) => `$${price}`, 
+        formatPrice: (price: number) => `${price}`, 
         symbol: '$',
         // Add any other properties that your code might use
       };
