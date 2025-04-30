@@ -152,81 +152,81 @@ export const CurrencyProvider = ({ children }: CurrencyProviderProps) => {
   const [loading, setLoading] = useState<boolean>(true);
   const { user, isLoading: authLoading } = useAuth();
 
-  // Detect user's currency preference or use location-based default
-  useEffect(() => {
-    const initCurrency = async () => {
-      try {
-        setLoading(true);
+  // // Detect user's currency preference or use location-based default
+  // useEffect(() => {
+  //   const initCurrency = async () => {
+  //     try {
+  //       setLoading(true);
         
-        console.log('Initializing currency context...');
+  //       console.log('Initializing currency context...');
         
-        // If user is authenticated, get their currency preference
-        if (user) {
-          console.log('User is authenticated, checking currency preference...');
-          const userCurrency = await getUserCurrencyPreference(user.id);
+  //       // If user is authenticated, get their currency preference
+  //       if (user) {
+  //         console.log('User is authenticated, checking currency preference...');
+  //         const userCurrency = await getUserCurrencyPreference(user.id);
           
-          if (userCurrency && SUPPORTED_CURRENCIES[userCurrency]) {
-            console.log(`User has currency preference set: ${userCurrency}`);
-            setCurrency(userCurrency as CurrencyCode);
-            setSymbol(SUPPORTED_CURRENCIES[userCurrency].symbol);
-            setLoading(false);
-            return;
-          }
-        } 
+  //         if (userCurrency && SUPPORTED_CURRENCIES[userCurrency]) {
+  //           console.log(`User has currency preference set: ${userCurrency}`);
+  //           setCurrency(userCurrency as CurrencyCode);
+  //           setSymbol(SUPPORTED_CURRENCIES[userCurrency].symbol);
+  //           setLoading(false);
+  //           return;
+  //         }
+  //       } 
         
-        // Fallback to location-based currency if no user preference
-        try {
-          console.log('Detecting country from IP...');
-          const countryCode = await getCountryFromIP();
+  //       // Fallback to location-based currency if no user preference
+  //       try {
+  //         console.log('Detecting country from IP...');
+  //         const countryCode = await getCountryFromIP();
           
-          if (countryCode) {
-            console.log(`Country detected: ${countryCode}`);
+  //         if (countryCode) {
+  //           console.log(`Country detected: ${countryCode}`);
             
-            // Save country code to profile if user is logged in
-            if (user) {
-              console.log(`Saving country code ${countryCode} for user ${user.id}`);
-              await saveUserCountry(user.id, countryCode);
-            }
+  //           // Save country code to profile if user is logged in
+  //           if (user) {
+  //             console.log(`Saving country code ${countryCode} for user ${user.id}`);
+  //             await saveUserCountry(user.id, countryCode);
+  //           }
             
-            // Get currency for this country
-            const locationCurrency = countryCurrencyMap[countryCode] || DEFAULT_CURRENCY;
-            console.log(`Mapped country ${countryCode} to currency: ${locationCurrency}`);
+  //           // Get currency for this country
+  //           const locationCurrency = countryCurrencyMap[countryCode] || DEFAULT_CURRENCY;
+  //           console.log(`Mapped country ${countryCode} to currency: ${locationCurrency}`);
             
-            setCurrency(locationCurrency);
-            setSymbol(SUPPORTED_CURRENCIES[locationCurrency].symbol);
+  //           setCurrency(locationCurrency);
+  //           setSymbol(SUPPORTED_CURRENCIES[locationCurrency].symbol);
             
-            // Save this preference if user is logged in
-            if (user) {
-              console.log(`Saving currency preference ${locationCurrency} for user ${user.id}`);
-              await saveUserCurrencyPreference(user.id, locationCurrency);
-            }
+  //           // Save this preference if user is logged in
+  //           if (user) {
+  //             console.log(`Saving currency preference ${locationCurrency} for user ${user.id}`);
+  //             await saveUserCurrencyPreference(user.id, locationCurrency);
+  //           }
             
-            setLoading(false);
-            return;
-          }
-        } catch (locationError) {
-          console.error('Error detecting location-based currency:', locationError);
-        }
+  //           setLoading(false);
+  //           return;
+  //         }
+  //       } catch (locationError) {
+  //         console.error('Error detecting location-based currency:', locationError);
+  //       }
         
-        // Default fallback
-        console.log(`No country detected or currency mapped. Using default: ${DEFAULT_CURRENCY}`);
-        setCurrency(DEFAULT_CURRENCY as CurrencyCode);
-        setSymbol(SUPPORTED_CURRENCIES[DEFAULT_CURRENCY].symbol);
-      } catch (error) {
-        console.error('Error initializing currency:', error);
-        // Fallback to default
-        setCurrency(DEFAULT_CURRENCY as CurrencyCode);
-        setSymbol(SUPPORTED_CURRENCIES[DEFAULT_CURRENCY].symbol);
-      } finally {
-        setLoading(false);
-      }
-    };
+  //       // Default fallback
+  //       console.log(`No country detected or currency mapped. Using default: ${DEFAULT_CURRENCY}`);
+  //       setCurrency(DEFAULT_CURRENCY as CurrencyCode);
+  //       setSymbol(SUPPORTED_CURRENCIES[DEFAULT_CURRENCY].symbol);
+  //     } catch (error) {
+  //       console.error('Error initializing currency:', error);
+  //       // Fallback to default
+  //       setCurrency(DEFAULT_CURRENCY as CurrencyCode);
+  //       setSymbol(SUPPORTED_CURRENCIES[DEFAULT_CURRENCY].symbol);
+  //     } finally {
+  //       setLoading(false);
+  //     }
+  //   };
 
-    // Only initialize after auth state is determined
-    if (!authLoading) {
-      initCurrency();
-    }
-  }, [user, authLoading]);
+  //   // Only initialize after auth state is determined
+  //   if (!authLoading) {
+  //     initCurrency();
+  //   }
+  // }, [user, authLoading]);
 
   // Convert price from one currency to another
   const convertPrice = async (amount: number, fromCurrency: CurrencyCode = DEFAULT_CURRENCY as CurrencyCode): Promise<number> => {

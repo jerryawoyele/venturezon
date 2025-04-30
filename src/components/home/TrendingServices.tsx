@@ -96,13 +96,17 @@ export function TrendingServices() {
       // Then fetch booking data in a separate query
       const { data: bookingsData, error: bookingsError } = await supabase
         .from('bookings')
-        .select('id, service_id, created_at');
+        .select('id, service_id, created_at, status');
       
       if (bookingsError) throw bookingsError;
       
-      // Group bookings by service ID
+      // Group bookings by service ID - only count completed and confirmed bookings for ranking
       const bookingsByService = (bookingsData || []).reduce((acc, booking) => {
         if (!booking.service_id) return acc;
+        // We only want to count valid bookings (confirmed, completed, pending_completion)
+        if (!['confirmed', 'completed', 'pending_completion'].includes(booking.status)) {
+          return acc;
+        }
         if (!acc[booking.service_id]) {
           acc[booking.service_id] = [];
         }
@@ -117,7 +121,8 @@ export function TrendingServices() {
           ...service,
           bookings: serviceBookings.map(booking => ({
             id: booking.id,
-            created_at: booking.created_at
+            created_at: booking.created_at,
+            status: booking.status
           }))
         };
       });

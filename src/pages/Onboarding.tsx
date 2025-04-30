@@ -9,10 +9,12 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/components/ui/use-toast";
 import { Briefcase, User, ArrowRight, Image, Check, CheckCircle } from "lucide-react";
 import { FileUpload } from "@/components/FileUpload";
+import { useTheme } from "@/contexts/ThemeContext";
 
 export function Onboarding() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { theme } = useTheme(); // Only need theme for reference, not forcing it
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
@@ -293,9 +295,9 @@ export function Onboarding() {
   }, [currentStep]);
   
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center p-4 relative">
-      {/* Dark background overlay with subtle gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-gray-900 to-black opacity-90 z-0"></div>
+    <div className="min-h-screen bg-background flex items-center justify-center p-4 relative">
+      {/* Background overlay with gradient that respects theme */}
+      <div className="absolute inset-0 bg-gradient-to-br from-background/80 to-background opacity-90 z-0"></div>
       
       <div className="w-full max-w-2xl relative z-10">
         {/* Progress bar */}
@@ -310,7 +312,7 @@ export function Onboarding() {
                   : "Business Profile"}
             </div>
           </div>
-          <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden">
+          <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
             <div 
               className="h-full bg-primary transition-all duration-300 ease-out"
               style={{ 
@@ -320,13 +322,13 @@ export function Onboarding() {
           </div>
         </div>
         
-        <div ref={modalContainerRef} className="bg-black/60 backdrop-blur-sm border border-white/10 rounded-lg p-8 shadow-xl max-h-[70vh] overflow-y-auto">
+        <div ref={modalContainerRef} className="bg-card/80 backdrop-blur-sm border border-border rounded-lg p-8 shadow-xl max-h-[70vh] overflow-y-auto">
           {/* Step 1: Username, Bio, and Profile Picture */}
           {currentStep === 1 && (
             <div className="space-y-6">
               <div className="text-center mb-6">
                 <h1 className="text-2xl font-bold mb-2">Let's create your profile</h1>
-                <p className="text-white/60">Tell us a bit about yourself</p>
+                <p className="text-muted-foreground">Tell us a bit about yourself</p>
               </div>
               
               <div className="space-y-4">
@@ -353,7 +355,7 @@ export function Onboarding() {
                     <p className="text-sm text-red-500">{usernameError}</p>
                   ) : (
                     <>
-                      <p className="text-xs text-white/60">
+                      <p className="text-xs text-muted-foreground">
                         Username can only contain letters, numbers, and underscores with no spaces.
                       </p>
                       {username && (
@@ -384,7 +386,7 @@ export function Onboarding() {
                     folder="avatars"
                     accept="image/*"
                   >
-                    <div className="border-2 border-dashed border-white/20 rounded-lg p-8 text-center cursor-pointer hover:border-white/40 transition-colors">
+                    <div className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer hover:border-border/60 transition-colors">
                       {avatarUrl ? (
                         <div className="flex flex-col items-center">
                           <img 
@@ -392,13 +394,13 @@ export function Onboarding() {
                             alt="Profile" 
                             className="w-20 h-20 rounded-full object-cover mb-4"
                           />
-                          <span className="text-sm text-white/60">Click to change</span>
+                          <span className="text-sm text-muted-foreground">Click to change</span>
                         </div>
                       ) : (
                         <div className="flex flex-col items-center">
-                          <Image className="w-12 h-12 mb-2 text-white/40" />
-                          <p className="text-white/80 mb-1">Upload profile picture</p>
-                          <p className="text-sm text-white/60">Max 2MB</p>
+                          <Image className="w-12 h-12 mb-2 text-muted-foreground" />
+                          <p className="text-foreground mb-1">Upload profile picture</p>
+                          <p className="text-sm text-muted-foreground">Max 2MB</p>
                         </div>
                       )}
                     </div>
@@ -413,18 +415,18 @@ export function Onboarding() {
             <div className="space-y-6">
               <div className="text-center mb-6">
                 <h1 className="text-2xl font-bold mb-2">How will you use Venturezon?</h1>
-                <p className="text-white/60">Choose the option that best describes you</p>
+                <p className="text-muted-foreground">Choose the option that best describes you</p>
               </div>
               
               <RadioGroup value={userRole} onValueChange={(value) => setUserRole(value as "business" | "customer")} className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                <div className={`border rounded-lg p-6 cursor-pointer transition-all ${userRole === "customer" ? "border-primary bg-primary/10" : "border-white/10 hover:border-white/30"}`}
+                <div className={`border rounded-lg p-6 cursor-pointer transition-all ${userRole === "customer" ? "border-primary bg-primary/10" : "border-border hover:border-border/60"}`}
                   onClick={() => setUserRole("customer")}>
                   <RadioGroupItem value="customer" id="customer" className="sr-only" />
                   <Label htmlFor="customer" className="flex flex-col items-center gap-4 cursor-pointer">
-                    <User size={48} className={userRole === "customer" ? "text-primary" : ""} />
+                    <User size={48} className={userRole === "customer" ? "text-primary" : "text-muted-foreground"} />
                     <div className="text-center">
                       <div className="font-medium text-xl mb-2">Customer</div>
-                      <p className="text-white/60">
+                      <p className="text-muted-foreground">
                         I want to discover and purchase services from businesses
                       </p>
                     </div>
@@ -436,14 +438,14 @@ export function Onboarding() {
                   </Label>
                 </div>
                 
-                <div className={`border rounded-lg p-6 cursor-pointer transition-all ${userRole === "business" ? "border-primary bg-primary/10" : "border-white/10 hover:border-white/30"}`}
+                <div className={`border rounded-lg p-6 cursor-pointer transition-all ${userRole === "business" ? "border-primary bg-primary/10" : "border-border hover:border-border/60"}`}
                   onClick={() => setUserRole("business")}>
                   <RadioGroupItem value="business" id="business" className="sr-only" />
                   <Label htmlFor="business" className="flex flex-col items-center gap-4 cursor-pointer">
-                    <Briefcase size={48} className={userRole === "business" ? "text-primary" : ""} />
+                    <Briefcase size={48} className={userRole === "business" ? "text-primary" : "text-muted-foreground"} />
                     <div className="text-center">
                       <div className="font-medium text-xl mb-2">Business</div>
-                      <p className="text-white/60">
+                      <p className="text-muted-foreground">
                         I want to offer services and reach potential customers
                       </p>
                     </div>
@@ -463,7 +465,7 @@ export function Onboarding() {
             <div className="space-y-6">
               <div className="text-center mb-6">
                 <h1 className="text-2xl font-bold mb-2">Tell us about your business</h1>
-                <p className="text-white/60">Help customers understand what you offer</p>
+                <p className="text-muted-foreground">Help customers understand what you offer</p>
               </div>
               
               <div className="space-y-4">
@@ -475,7 +477,7 @@ export function Onboarding() {
                     value={businessName}
                     onChange={(e) => setBusinessName(e.target.value)}
                   />
-                  <p className="text-xs text-white/60">
+                  <p className="text-xs text-muted-foreground">
                     This will be displayed prominently on your profile
                   </p>
                 </div>
@@ -489,7 +491,7 @@ export function Onboarding() {
                     onChange={(e) => setAboutBusiness(e.target.value)}
                     className="min-h-32"
                   />
-                  <p className="text-xs text-white/60">
+                  <p className="text-xs text-muted-foreground">
                     This will be displayed on your profile to help customers learn about your services
                   </p>
                 </div>

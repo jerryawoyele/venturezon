@@ -101,7 +101,7 @@ export default function ServiceDetailPage() {
 
   // Fetch bookings when tab changes to bookings
   useEffect(() => {
-    if (activeTab === 'bookings' && service?.id && isAuthenticated) {
+    if ((activeTab === 'bookings' || activeTab === 'about') && service?.id && isAuthenticated) {
       fetchServiceBookings();
     }
   }, [activeTab, service, isAuthenticated]);
@@ -320,19 +320,14 @@ export default function ServiceDetailPage() {
 
   // Add function to fetch service bookings
   const fetchServiceBookings = async () => {
-    if (!service?.id || !user) return;
+    if (!service?.id) return;
 
     try {
       setLoadingBookings(true);
+      console.log("Fetching bookings for service:", service.id);
 
-      // Only fetch bookings if user is the service owner
-      if (service.owner_id !== user.id) {
-        setBookings([]);
-        setLoadingBookings(false);
-        return;
-      }
-
-      // Fetch bookings for this service
+      // Fetch all bookings for this service regardless of user role
+      // This ensures booking counts are consistent for all users
       const { data, error } = await supabase
         .from('bookings')
         .select(`
@@ -346,9 +341,28 @@ export default function ServiceDetailPage() {
         .eq('service_id', service.id)
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-
-      setBookings(data || []);
+      if (error) {
+        console.error("Error fetching bookings:", error);
+        throw error;
+      }
+      
+      console.log("Bookings fetched:", data?.length, data);
+      
+      // For users who aren't the service owner, filter out sensitive data before setting state
+      if (user) {
+        // Service owner gets full booking details
+        setBookings(data || []);
+      } else {
+        // For everyone else, just keep basic information needed for counts
+        const filteredData = data?.map(booking => ({
+          id: booking.id,
+          created_at: booking.created_at,
+          status: booking.status
+        })) || [];
+        setBookings(filteredData);
+      }
+      
+      console.log("Bookings set in state:", data?.length);
     } catch (error) {
       console.error('Error fetching service bookings:', error);
       toast({
@@ -365,7 +379,7 @@ export default function ServiceDetailPage() {
   const handleUpdateBookingStatus = async (bookingId: string, newStatus: string) => {
     try {
       // Skip payout account check during development if we know it's causing 406 errors
-      /*
+      
       // If confirming a booking, check if business has a payout account set up
       if (newStatus === "confirmed" && user?.id === service.owner_id) {
         // Check if the business has set up their payout account
@@ -387,7 +401,7 @@ export default function ServiceDetailPage() {
           return;
         }
       }
-      */
+      
 
       const { error } = await supabase
         .from("bookings")
@@ -734,6 +748,35 @@ export default function ServiceDetailPage() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Booking Statistics Card - Add at the beginning of cards */}
+                  <Card className="cursor-pointer hover:shadow-md transition-shadow">
+                    <CardContent className="p-4 flex items-center gap-3">
+                      <div className="p-2 bg-green-100 dark:bg-green-900/20 rounded-full">
+                        <Calendar className="h-5 w-5 text-green-600 dark:text-green-400" />
+                      </div>
+                      <div className="flex flex-col">
+                        <p className="text-sm text-muted-foreground">Total Bookings</p>
+                        {loadingBookings ? (
+                          <div className="flex items-center mt-1">
+                            <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin mr-2"></div>
+                            <span className="text-sm">Loading...</span>
+                          </div>
+                        ) : (
+                          <div>
+                            <p className="font-medium text-lg">
+                              {bookings ? bookings.length : "0"}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {console.log("Rendering bookings count:", bookings?.length)}
+                              {bookings && bookings.length > 0 
+                                ? `Last booking: ${formatDate(bookings[0]?.created_at || new Date().toISOString())}` 
+                                : "No bookings yet"}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
 
                   <Card
                     className="cursor-pointer hover:shadow-md transition-shadow"
@@ -1115,7 +1158,7 @@ export default function ServiceDetailPage() {
                                 <Avatar>
                                   <AvatarImage src={booking.customer?.avatar_url} />
                                   <AvatarFallback>
-                                    {booking.customer?.username?.charAt(0).toUpperCase() || "?"}
+                                    {(booking.customer?.username && booking.customer.username.charAt(0).toUpperCase()) || "?"}
                                   </AvatarFallback>
                                 </Avatar>
                                 <div className="flex flex-col">

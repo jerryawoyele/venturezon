@@ -1,0 +1,2 @@
+The services table is meant to be connected to the bookings table, whereby from each service, one would be able to get the bookings on that service in the db, and from there getting the info in the app about bookings of services in the app will be easier. If there's to be a change in the schema of any table, manually create it.
+Also, add an confirm_service completion status on the bookings table so that when it is at that status, the card for confirming the service completion will show.

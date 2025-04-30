@@ -14,7 +14,9 @@ import {
   Info, 
   ArrowLeft,
   DollarSign,
-  Globe
+  Globe,
+  AlertTriangle,
+  MessageSquare
 } from "lucide-react";
 import { MainLayout } from "@/layouts/MainLayout";
 import { supabase } from "@/integrations/supabase/client";
@@ -25,6 +27,25 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCurrency } from "@/contexts/CurrencyContext";
+
+// Add PaystackPop type definition
+declare global {
+  interface Window {
+    PaystackPop: {
+      setup: (config: {
+        key: string;
+        email: string;
+        amount: number;
+        currency: string;
+        ref: string;
+        callback: (response: any) => void;
+        onClose: () => void;
+      }) => {
+        openIframe: () => void;
+      };
+    };
+  }
+}
 
 // Payment gateway endpoints - replace with your actual endpoints in production
 const STRIPE_CHECKOUT_URL = "/api/create-checkout-session";
@@ -66,7 +87,7 @@ export default function PaymentPage() {
   const [userCountry, setUserCountry] = useState<string | null>(null);
   const [preferredGateway, setPreferredGateway] = useState<'stripe' | 'paystack'>('stripe');
   const [detectingLocation, setDetectingLocation] = useState(true);
-  const { formatPrice, symbol } = useCurrency();
+  const { formatPrice, symbol, currency } = useCurrency();
 
   // Add a useEffect to track when the user data is loaded
   useEffect(() => {
@@ -140,6 +161,7 @@ export default function PaymentPage() {
     }
     
     setProcessingPayment(true);
+    console.log("Processing payment for booking:", booking.id, "Current status:", booking.status);
     
     try {
       let paymentId;
@@ -178,11 +200,12 @@ export default function PaymentPage() {
         setEscrowPayment(payment);
       }
       
-      // Update booking status to pending (awaiting provider confirmation)
+      // Update booking status from draft to pending (awaiting provider confirmation)
+      // Only update the status if it's currently in draft state
       const { error: updateError } = await supabase
         .from("bookings")
         .update({
-          status: "pending",
+          status: booking.status === "draft" ? "pending" : booking.status, // Only update if draft
           payment_status: "completed",
         })
         .eq("id", booking.id);
@@ -194,6 +217,8 @@ export default function PaymentPage() {
           description: "Payment processed but booking status update failed. Please contact support.",
           variant: "destructive",
         });
+      } else {
+        console.log("Successfully updated booking status from draft to pending");
       }
       
       // Create a notification for the service provider
@@ -221,7 +246,7 @@ export default function PaymentPage() {
       
       toast({
         title: "Payment successful",
-        description: "Your payment has been processed and is in escrow",
+        description: "Your payment has been processed and your booking is now confirmed",
       });
     } catch (error) {
       console.error("Error processing payment:", error);
@@ -301,18 +326,111 @@ export default function PaymentPage() {
 
     setProcessingPayment(true);
 
-    // Since the API endpoint doesn't exist yet, we'll simulate a successful payment
-    // This would be replaced with a real API call in production
-    setTimeout(() => {
-      // Simulate a successful payment response
-      const mockResponse = {
-        authorization_url: `${window.location.origin}/payment/${booking.id}?payment_status=success&reference=mock_paystack_${Date.now()}&source=paystack`,
-        reference: `paystack_${Date.now()}`
-      };
+    try {
+      // Check if Paystack JS is loaded
+      if (typeof window.PaystackPop === 'undefined') {
+        // Load Paystack script if not already loaded
+        const script = document.createElement('script');
+        script.src = 'https://js.paystack.co/v1/inline.js';
+        script.async = true;
+        script.onload = () => {
+          // Once script is loaded, initialize payment
+          initializePaystackPayment();
+        };
+        script.onerror = () => {
+          throw new Error('Failed to load Paystack script');
+        };
+        document.body.appendChild(script);
+      } else {
+        // If already loaded, initialize payment directly
+        initializePaystackPayment();
+      }
+    } catch (error) {
+      console.error('Paystack initialization error:', error);
+      toast({
+        title: "Payment Failed",
+        description: "Unable to initialize Paystack payment. Please try again.",
+        variant: "destructive",
+      });
+      setProcessingPayment(false);
+    }
+  };
+
+  // Initialize Paystack payment with inline JS
+  const initializePaystackPayment = () => {
+    // Calculate final amount
+    const { total } = calculateAmounts();
+    const amountInKobo = Math.round(total * 100); // Convert to kobo (smallest currency unit)
+    
+    console.log(`Initializing Paystack with: ${user!.email}, amount: ${amountInKobo}, ref: booking_${booking!.id}_${Date.now()}`);
+    
+    try {
+      const handler = window.PaystackPop.setup({
+        key: 'pk_test_your_public_key', // Replace with your Paystack public key in production
+        email: user!.email!,
+        amount: amountInKobo,
+        currency: currency === 'NGN' ? 'NGN' : 'USD', // Use NGN for Nigeria, USD for others
+        ref: `booking_${booking!.id}_${Date.now()}`,
+        callback: async function(response: any) {
+          console.log('Paystack payment successful:', response);
+          
+          try {
+            // Create escrow payment record
+            const payment = await EscrowService.createPayment(
+              booking!.id,
+              service!.price,
+              user!.id,
+              booking!.provider_id,
+              service!.id,
+              false, // Not external
+              undefined, // No payment ID
+              'paystack', // Gateway
+              response.reference // Transaction reference
+            );
+            
+            if (!payment) {
+              throw new Error('Failed to create payment record');
+            }
+            
+            setEscrowPayment(payment);
+            
+            // Update URL with success parameters without reloading
+            const newUrl = `${window.location.pathname}?payment_status=success&reference=${response.reference}&source=paystack`;
+            window.history.pushState({ path: newUrl }, '', newUrl);
+            
+            // Handle payment success
+            handlePaymentSuccess();
+          } catch (error) {
+            console.error('Error processing successful payment:', error);
+            toast({
+              title: "Payment Processing Error",
+              description: "Your payment was successful, but we couldn't process your booking. Please contact support.",
+              variant: "destructive",
+            });
+            setProcessingPayment(false);
+          }
+        },
+        onClose: function() {
+          console.log('Paystack payment window closed');
+          toast({
+            title: "Payment Cancelled",
+            description: "You've cancelled the payment process. Your booking is not confirmed.",
+            variant: "default",
+          });
+          setProcessingPayment(false);
+        }
+      });
       
-      // Redirect to the authorization URL
-      window.location.href = mockResponse.authorization_url;
-    }, 1500);
+      handler.openIframe();
+    } catch (error) {
+      console.error('Error in Paystack setup:', error);
+      toast({
+        title: "Payment Error",
+        description: "There was a problem setting up the payment. Please try again.",
+        variant: "destructive",
+      });
+      setProcessingPayment(false);
+    }
   };
 
   // Load booking details
@@ -474,10 +592,87 @@ export default function PaymentPage() {
     if (!service) return { subtotal: 0, fee: 0, total: 0 };
     
     const subtotal = service.price;
-    const fee = EscrowService.calculatePlatformFee(subtotal);
-    const total = EscrowService.calculateTotalAmount(subtotal);
+    
+    // Use fixed fee calculation instead of percentage
+    const fee = calculateFixedPlatformFee(subtotal);
+    const total = subtotal + fee;
     
     return { subtotal, fee, total };
+  };
+
+  // Format the platform fee based on the currency
+  const formatPlatformFee = (fee: number): string => {
+    console.log("Formatting platform fee:", fee, "Currency:", currency);
+    
+    if (currency === 'NGN') {
+      // For NGN, directly use the symbol and the fee without conversion
+      return `${symbol}${fee}`;
+    } else {
+      // For other currencies, use the normal formatPrice function
+      return formatPrice(fee);
+    }
+  };
+
+  // Fixed fee calculation (matching the MultiStepBookingModal.tsx implementation)
+  const calculateFixedPlatformFee = (amount: number): number => {
+    console.log(`Payment page calculating fee for amount: ${amount} in currency: ${currency}`);
+    
+    // For Naira (NGN) currency
+    if (currency === 'NGN') {
+      // Fixed fee structure for Naira
+      let fee = 0;
+      if (amount <= 3000) fee = 100;
+      else if (amount <= 6000) fee = 200;
+      else if (amount <= 10000) fee = 300;
+      else if (amount <= 20000) fee = 400;
+      else if (amount <= 50000) fee = 500;
+      else if (amount <= 100000) fee = 600;
+      else if (amount <= 500000) fee = 800;
+      else if (amount <= 1000000) fee = 1000;
+      else if (amount <= 2000000) fee = 1500;
+      else fee = 2000; // for 2 million and above
+      
+      console.log(`NGN fee calculated: ${fee} for amount ${amount}`);
+      return fee;
+    }
+    
+    // For other currencies (USD, etc.)
+    if (currency === 'USD') {
+      let fee = 0;
+      if (amount <= 2) fee = 0.07;
+      else if (amount <= 4) fee = 0.13;
+      else if (amount <= 7) fee = 0.20;
+      else if (amount <= 15) fee = 0.27;
+      else if (amount <= 35) fee = 0.33;
+      else if (amount <= 70) fee = 0.40;
+      else if (amount <= 350) fee = 0.53;
+      else if (amount <= 700) fee = 0.67;
+      else if (amount <= 1400) fee = 1.00;
+      else fee = 1.33;
+      
+      console.log(`USD fee calculated: ${fee} for amount ${amount}`);
+      return fee;
+    }
+    
+    // Default fallback - use NGN structure if currency not specifically handled
+    const exchangeRates = { NGN: 1, USD: 1500 }; // Simplified rate table
+    const rate = exchangeRates[currency as keyof typeof exchangeRates] || 1;
+    const amountInNgn = amount * rate;
+    
+    let fee = 0;
+    if (amountInNgn <= 3000) fee = 100 / rate;
+    else if (amountInNgn <= 6000) fee = 200 / rate;
+    else if (amountInNgn <= 10000) fee = 300 / rate;
+    else if (amountInNgn <= 20000) fee = 400 / rate;
+    else if (amountInNgn <= 50000) fee = 500 / rate;
+    else if (amountInNgn <= 100000) fee = 600 / rate;
+    else if (amountInNgn <= 500000) fee = 800 / rate;
+    else if (amountInNgn <= 1000000) fee = 1000 / rate;
+    else if (amountInNgn <= 2000000) fee = 1500 / rate;
+    else fee = 2000 / rate;
+    
+    console.log(`Converted fee calculated: ${fee} for amount ${amount} in ${currency} (converted from NGN)`);
+    return fee;
   };
 
   // Render payment options form
@@ -508,7 +703,7 @@ export default function PaymentPage() {
           ) : (
             <>
               {PAYSTACK_SUPPORTED_COUNTRIES.includes(userCountry || '') ? (
-                // Show only Paystack for supported countries
+                // Show Paystack for supported countries
                 <div className="space-y-4">
                   <Button 
                     className="w-full bg-green-600 hover:bg-green-700" 
@@ -523,7 +718,7 @@ export default function PaymentPage() {
                     ) : (
                       <>
                         <span className="mr-2">{symbol}</span>
-                        Pay {formatPrice(calculateAmounts().total)} with Paystack
+                        Pay {currency === 'NGN' ? `${calculateAmounts().total}` : formatPrice(calculateAmounts().total)} with Paystack
                       </>
                     )}
                   </Button>
@@ -533,28 +728,29 @@ export default function PaymentPage() {
                   </div>
                 </div>
               ) : (
-                // Show only Stripe for non-supported countries
+                // For countries where Paystack is not supported
                 <div className="space-y-4">
+                  <Alert className="bg-amber-900 border-amber-200">
+                    <AlertTriangle className="h-4 w-4 text-amber-600" />
+                    <AlertTitle>Online Payment Not Available</AlertTitle>
+                    <AlertDescription>
+                      Online payments are currently only available in Nigeria, Ghana, South Africa, and Kenya through Paystack.
+                      Stripe payments will be available soon. For now, please coordinate with the service provider for direct payment.
+                    </AlertDescription>
+                  </Alert>
+                  
                   <Button 
+                    variant="outline"
                     className="w-full" 
-                    disabled={processingPayment}
-                    onClick={redirectToStripeCheckout}
+                    onClick={() => navigate(`/messages?user=${booking.provider_id}`)}
                   >
-                    {processingPayment ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Processing Payment...
-                      </>
-                    ) : (
-                      <>
-                        <CreditCard className="mr-2 h-4 w-4" />
-                        Pay {formatPrice(calculateAmounts().total)} with Stripe
-                      </>
-                    )}
+                    <MessageSquare className="mr-2 h-4 w-4" />
+                    Contact Service Provider
                   </Button>
-                  <div className="flex items-center justify-center text-xs text-muted-foreground gap-1">
-                    <Lock className="h-3 w-3" />
-                    Secure Payment Processing with Stripe
+                  
+                  <div className="text-center text-sm text-muted-foreground">
+                    <Globe className="inline h-3 w-3 mr-1" />
+                    We're working to expand our payment options to more countries soon.
                   </div>
                 </div>
               )}
@@ -605,8 +801,8 @@ export default function PaymentPage() {
                   <span>{formatPrice(calculateAmounts().subtotal)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Platform Fee (8%)</span>
-                  <span>{formatPrice(calculateAmounts().fee)}</span>
+                  <span>Platform Fee</span>
+                  <span>{formatPlatformFee(calculateAmounts().fee)}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between font-bold">
@@ -737,8 +933,8 @@ export default function PaymentPage() {
                     <span>{formatPrice(calculateAmounts().subtotal)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Platform Fee (8%)</span>
-                    <span>{formatPrice(calculateAmounts().fee)}</span>
+                    <span>Platform Fee</span>
+                    <span>{formatPlatformFee(calculateAmounts().fee)}</span>
                   </div>
                   <Separator />
                   <div className="flex justify-between font-bold">

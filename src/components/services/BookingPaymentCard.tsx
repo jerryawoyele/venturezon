@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/components/ui/use-toast";
 import { EscrowService } from "@/utils/escrow-service";
+import { supabase } from "@/integrations/supabase/client";
 import { 
   CreditCard, 
   Shield, 
@@ -37,6 +38,7 @@ export const BookingPaymentCard = ({ booking, onPaymentAction }: BookingPaymentC
   const { toast } = useToast();
   const [isReleasing, setIsReleasing] = useState(false);
   const [isRefunding, setIsRefunding] = useState(false);
+  const [isMarkingCompleted, setIsMarkingCompleted] = useState(false);
   const [showRefundDialog, setShowRefundDialog] = useState(false);
   
   const payment = booking?.escrow_payments && booking.escrow_payments.length > 0 ? booking.escrow_payments[0] : null;
@@ -44,7 +46,7 @@ export const BookingPaymentCard = ({ booking, onPaymentAction }: BookingPaymentC
   const { formatPrice } = useCurrency();
   
   // Check if this booking has a payment
-  if (!payment) {
+  if (!payment && booking.status !== 'confirmed') {
     return (
       <Card>
         <CardHeader>
@@ -139,7 +141,65 @@ export const BookingPaymentCard = ({ booking, onPaymentAction }: BookingPaymentC
     }
   };
   
+  // Handle marking service as completed - requiring customer confirmation
+  const handleMarkCompleted = async () => {
+    if (!booking.id) return;
+    
+    setIsMarkingCompleted(true);
+    try {
+      // Update booking status to pending_completion
+      const { error } = await supabase
+        .from('bookings')
+        .update({ status: 'pending_completion' })
+        .eq('id', booking.id);
+        
+      if (error) throw error;
+      
+      // Send notification to customer about pending confirmation
+      if (booking.customer_id) {
+        await supabase.from("notifications").insert({
+          user_id: booking.customer_id,
+          type: "booking_completion_request",
+          title: "Service Completion Confirmation Required",
+          message: `Service provider has marked "${booking.services?.title || 'your booking'}" as completed. Please confirm to release payment.`,
+          is_read: false,
+          data: JSON.stringify({
+            booking_id: booking.id,
+            service_id: booking.service_id
+          }),
+        });
+      }
+      
+      toast({
+        title: "Service marked as completed",
+        description: "Customer has been notified to confirm service completion.",
+        variant: "default",
+      });
+      
+      if (onPaymentAction) {
+        onPaymentAction("pending_completion", booking.id);
+      }
+    } catch (error) {
+      console.error("Error marking service as completed:", error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred. Please try again later.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsMarkingCompleted(false);
+    }
+  };
+  
   const getStatusBadge = () => {
+    if (booking.status === 'pending_completion') {
+      return <Badge variant="outline" className="bg-blue-50 text-blue-600">Awaiting Customer Confirmation</Badge>;
+    }
+    
+    if (!payment) {
+      return <Badge variant="outline" className="bg-yellow-50 text-yellow-700">No Payment</Badge>;
+    }
+    
     switch (payment.status) {
       case 'pending':
         return <Badge variant="outline" className="bg-yellow-50 text-yellow-700">Payment Pending</Badge>;
@@ -156,8 +216,85 @@ export const BookingPaymentCard = ({ booking, onPaymentAction }: BookingPaymentC
     }
   };
   
-  const canRelease = payment.status === 'completed';
-  const canRefund = ['completed', 'pending'].includes(payment.status);
+  const canRelease = payment && payment.status === 'completed';
+  const canRefund = payment && ['completed', 'pending'].includes(payment.status);
+  // Can mark as completed when booking is confirmed and not already pending completion
+  const canMarkCompleted = booking.status === 'confirmed';
+
+  // Show completion card when there's no payment or payment info
+  if (!payment && booking.status === 'confirmed') {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Service Status</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-start gap-3 pb-3">
+            <div className="p-2 bg-primary/10 rounded-full">
+              <Clock className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <h3 className="font-medium mb-1">Service In Progress</h3>
+              <p className="text-sm text-muted-foreground">
+                This booking is confirmed and in progress. When the service is completed, mark it as done to notify the customer.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+        <CardFooter>
+          <Button 
+            className="w-full bg-green-600 hover:bg-green-700"
+            onClick={handleMarkCompleted}
+            disabled={isMarkingCompleted}
+          >
+            {isMarkingCompleted ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              <>
+                <CheckCircle className="mr-2 h-4 w-4" />
+                Mark Service as Completed
+              </>
+            )}
+          </Button>
+        </CardFooter>
+      </Card>
+    );
+  }
+  
+  // Show awaiting confirmation card
+  if (booking.status === 'pending_completion') {
+    return (
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Service Status</CardTitle>
+            {getStatusBadge()}
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-start gap-3 pb-3">
+            <div className="p-2 bg-blue-100 rounded-full">
+              <Clock className="h-5 w-5 text-blue-600" />
+            </div>
+            <div>
+              <h3 className="font-medium mb-1">Awaiting Customer Confirmation</h3>
+              <p className="text-sm text-muted-foreground">
+                The customer has been notified to confirm that the service has been completed. Once they confirm, the payment will be released to you.
+              </p>
+              {payment && (
+                <div className="text-sm font-medium mt-2">
+                  Expected payment: {formatPrice(payment.amount)}
+                </div>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
   
   return (
     <Card>
@@ -213,69 +350,87 @@ export const BookingPaymentCard = ({ booking, onPaymentAction }: BookingPaymentC
         </div>
       </CardContent>
       
-      {(canRelease || canRefund) && (
-        <CardFooter className="flex flex-col space-y-3">
-          {canRelease && (
-            <Button 
-              className="w-full" 
-              onClick={handleReleasePayment}
-              disabled={isReleasing}
-            >
-              {isReleasing ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <ArrowUpRight className="mr-2 h-4 w-4" />
-                  Release Payment
-                </>
-              )}
-            </Button>
-          )}
-          
-          {canRefund && (
-            <>
-              <AlertDialog open={showRefundDialog} onOpenChange={setShowRefundDialog}>
-                <AlertDialogTrigger asChild>
-                  <Button 
-                    variant="outline" 
-                    className="w-full"
-                    disabled={isRefunding}
-                  >
-                    {isRefunding ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Processing...
-                      </>
-                    ) : (
-                      <>
-                        <RefreshCw className="mr-2 h-4 w-4" />
-                        Refund Payment
-                      </>
-                    )}
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Confirm Refund</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Are you sure you want to refund this payment? This will cancel the booking and return the full amount to the customer.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleRefundPayment}>
-                      Confirm Refund
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </>
-          )}
-        </CardFooter>
-      )}
+      <CardFooter className="flex flex-col space-y-3">
+        {canMarkCompleted && (
+          <Button 
+            className="w-full bg-green-600 hover:bg-green-700" 
+            onClick={handleMarkCompleted}
+            disabled={isMarkingCompleted}
+          >
+            {isMarkingCompleted ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              <>
+                <CheckCircle className="mr-2 h-4 w-4" />
+                Mark Service as Completed
+              </>
+            )}
+          </Button>
+        )}
+        
+        {canRelease && (
+          <Button 
+            className="w-full" 
+            onClick={handleReleasePayment}
+            disabled={isReleasing}
+          >
+            {isReleasing ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              <>
+                <ArrowUpRight className="mr-2 h-4 w-4" />
+                Release Payment
+              </>
+            )}
+          </Button>
+        )}
+        
+        {canRefund && (
+          <>
+            <AlertDialog open={showRefundDialog} onOpenChange={setShowRefundDialog}>
+              <AlertDialogTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  disabled={isRefunding}
+                >
+                  {isRefunding ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Refund Payment
+                    </>
+                  )}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Refund Payment</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to refund the payment? This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleRefundPayment}>
+                    Confirm Refund
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </>
+        )}
+      </CardFooter>
     </Card>
   );
 }; 

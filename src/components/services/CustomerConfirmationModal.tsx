@@ -243,38 +243,58 @@ export function CustomerConfirmationModal({
           <>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <h4 className="font-medium">Service: {booking?.services?.title}</h4>
+                <h4 className="font-medium text-lg">{booking?.services?.title}</h4>
                 <p className="text-sm text-muted-foreground">Provider: {booking?.provider?.username}</p>
               </div>
               
+              <Alert className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
+                <div className="flex gap-2">
+                  <ThumbsUp className="h-5 w-5 text-blue-600 dark:text-blue-500" />
+                  <div>
+                    <h4 className="font-medium mb-1">Was the service completed satisfactorily?</h4>
+                    <p className="text-sm text-muted-foreground">
+                      By confirming, you're acknowledging that the service was completed as agreed and any payment will be released from escrow.
+                    </p>
+                  </div>
+                </div>
+              </Alert>
+              
               <Textarea
-                placeholder="Provide any feedback about the service (optional)"
+                placeholder="Optional: Leave feedback about your experience..."
                 value={feedbackText}
                 onChange={(e) => setFeedbackText(e.target.value)}
-                className="min-h-[100px]"
+                className="w-full h-24"
               />
-            </div>
-            
-            <DialogFooter className="flex space-x-2 sm:space-x-0">
-              <Button
-                variant="outline"
-                onClick={handleDispute}
-                disabled={loading}
-                className="flex items-center gap-2"
-              >
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ThumbsDown className="h-4 w-4" />}
-                Dispute
-              </Button>
               
-              <Button
-                onClick={handleConfirm}
-                disabled={loading}
-                className="flex items-center gap-2"
-              >
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ThumbsUp className="h-4 w-4" />}
-                Confirm Completion
-              </Button>
-            </DialogFooter>
+              <div className="flex justify-end space-x-3 pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => onDispute()}
+                  className="border-red-500 hover:bg-red-50 text-red-600 dark:hover:bg-red-900/20"
+                >
+                  <ThumbsDown className="h-4 w-4 mr-2" />
+                  Dispute Service
+                </Button>
+                <Button
+                  variant="default"
+                  onClick={() => handleConfirm()}
+                  disabled={loading}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <ThumbsUp className="h-4 w-4 mr-2" />
+                      Confirm Completion
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
           </>
         )}
       </DialogContent>

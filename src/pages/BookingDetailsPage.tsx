@@ -43,6 +43,8 @@ export default function BookingDetailsPage() {
   const [cancelling, setCancelling] = useState(false);
   const [makingPayment, setMakingPayment] = useState(false);
   const { formatPrice } = useCurrency();
+  const [confirming, setConfirming] = useState(false);
+  const [disputing, setDisputing] = useState(false);
 
   useEffect(() => {
     fetchBookingDetails();
@@ -115,10 +117,46 @@ export default function BookingDetailsPage() {
       if (booking.escrow_payments?.[0]?.id) {
         try {
           await EscrowService.refundPayment(booking.escrow_payments[0].id);
+          
+          // Update payment status in the database
+          await supabase
+            .from("escrow_payments")
+            .update({ status: "refunded" })
+            .eq("id", booking.escrow_payments[0].id);
         } catch (paymentError) {
           console.error("Error refunding payment:", paymentError);
           // Continue with cancellation even if refund fails
         }
+      }
+      
+      // Send cancellation notification to the provider if cancelled by customer
+      if (isCustomer() && booking.provider_id) {
+        await supabase.from("notifications").insert({
+          user_id: booking.provider_id,
+          type: "booking_cancelled",
+          title: "Booking Cancelled",
+          message: `${booking.customer?.username || 'A customer'} has cancelled their booking for "${booking.services?.title || 'your service'}"`,
+          is_read: false,
+          data: JSON.stringify({
+            booking_id: booking.id,
+            service_id: booking.service_id
+          }),
+        });
+      }
+      
+      // Send cancellation notification to the customer if cancelled by provider
+      if (isProvider() && booking.customer_id) {
+        await supabase.from("notifications").insert({
+          user_id: booking.customer_id,
+          type: "booking_cancelled",
+          title: "Booking Cancelled by Provider",
+          message: `${booking.provider?.username || 'The service provider'} has cancelled your booking for "${booking.services?.title || 'the service'}"`,
+          is_read: false,
+          data: JSON.stringify({
+            booking_id: booking.id,
+            service_id: booking.service_id
+          }),
+        });
       }
 
       toast({
@@ -141,37 +179,160 @@ export default function BookingDetailsPage() {
   };
 
   const handleConfirmCompletion = async () => {
-    // This will be handled by the CustomerConfirmationModal
-    fetchBookingDetails(); // Refresh the booking after confirmation
+    if (!booking) return;
+    
+    try {
+      setConfirming(true);
+      
+      // Update booking status to completed
+      const { error } = await supabase
+        .from('bookings')
+        .update({ 
+          status: "completed",
+          confirmation_date: new Date().toISOString()
+        })
+        .eq('id', booking.id);
+        
+      if (error) throw error;
+      
+      // Release payment if there is one
+      if (booking.escrow_payments?.[0]?.id) {
+        try {
+          await EscrowService.releasePayment(booking.escrow_payments[0].id);
+        } catch (paymentError) {
+          console.error("Error releasing payment:", paymentError);
+          // Continue with completion even if payment release fails
+        }
+      }
+      
+      // Send notification to provider
+      if (booking.provider_id) {
+        await supabase.from("notifications").insert({
+          user_id: booking.provider_id,
+          type: "booking_completed",
+          title: "Service Completed",
+          message: `Customer has confirmed completion of "${booking.services?.title || 'your service'}"`,
+          is_read: false,
+          data: JSON.stringify({
+            booking_id: booking.id,
+            service_id: booking.service_id
+          }),
+        });
+      }
+      
+      // Update UI
+      toast({
+        title: "Service Confirmed",
+        description: "You have confirmed the service completion. Payment has been released to the provider.",
+      });
+      
+      // Refetch booking data
+      fetchBookingDetails();
+      
+      // Close modal
+      setShowConfirmationModal(false);
+    } catch (error) {
+      console.error("Error confirming completion:", error);
+      toast({
+        title: "Error",
+        description: "Failed to confirm service completion. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setConfirming(false);
+    }
   };
 
   const handleDisputeCompletion = async (reason = "Customer disputed service completion", details = "") => {
     if (!booking || !user) return;
     
     try {
-      // Check if there's a payment to dispute
-      if (booking.escrow_payments?.[0]?.id) {
-        await EscrowService.createDispute(
-          booking.escrow_payments[0].id,
-          reason,
-          details || "Customer disputed the service completion",
-          user.id
-        );
+      setDisputing(true);
+      
+      // Update booking status to disputed
+      const { error } = await supabase
+        .from('bookings')
+        .update({ 
+          status: "disputed",
+          customer_feedback: details || "Service was not completed satisfactorily" 
+        })
+        .eq('id', booking.id);
         
-        toast({
-          title: "Dispute Filed",
-          description: "Your dispute has been filed. Our team will review it and contact you soon.",
+      if (error) throw error;
+      
+      // Create dispute for the payment if exists
+      if (booking.escrow_payments?.[0]?.id) {
+        try {
+          await EscrowService.createDispute(
+            booking.escrow_payments[0].id,
+            reason,
+            details || "Service was not completed satisfactorily",
+            user.id
+          );
+        } catch (disputeError) {
+          console.error("Error creating payment dispute:", disputeError);
+          // Continue even if dispute creation fails
+        }
+      }
+      
+      // Send notification to provider
+      if (booking.provider_id) {
+        await supabase.from("notifications").insert({
+          user_id: booking.provider_id,
+          type: "booking_dispute",
+          title: "Service Disputed",
+          message: `The customer has disputed the completion of "${booking.services?.title || 'your service'}"`,
+          is_read: false,
+          data: JSON.stringify({
+            booking_id: booking.id,
+            service_id: booking.service_id
+          }),
         });
       }
       
-      fetchBookingDetails(); // Refresh the booking after dispute
+      // Send notification to admin (in a real app, identify admins properly)
+      const { data: adminData } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_role', 'admin')
+        .limit(1);
+        
+      if (adminData && adminData.length > 0) {
+        await supabase.from("notifications").insert({
+          user_id: adminData[0].id,
+          type: "admin_dispute",
+          title: "New Service Dispute",
+          message: `A customer has disputed service completion. Review required.`,
+          is_read: false,
+          data: JSON.stringify({
+            booking_id: booking.id,
+            service_id: booking.service_id,
+            customer_id: user.id,
+            provider_id: booking.provider_id
+          }),
+        });
+      }
+      
+      // Update UI
+      toast({
+        title: "Dispute Filed",
+        description: "Your dispute has been filed. Our team will review it shortly.",
+      });
+      
+      // Refetch booking data
+      fetchBookingDetails();
+      
+      // Close modal
+      setShowConfirmationModal(false);
     } catch (error) {
       console.error("Error filing dispute:", error);
       toast({
         title: "Error",
-        description: "Failed to file dispute. Please try again or contact support.",
+        description: "Failed to file dispute. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setDisputing(false);
     }
   };
 

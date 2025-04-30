@@ -122,6 +122,16 @@ export default function ServicesAndBookingsPage() {
   // Add new state for pending completion bookings
   const [pendingCompletionBookings, setPendingCompletionBookings] = useState<any[]>([]);
 
+  // Add after the pendingCompletionBookings state
+  const [confirmationLoading, setConfirmationLoading] = useState<string | null>(null);
+  const [showDisputeServiceModal, setShowDisputeServiceModal] = useState(false);
+  const [serviceToDispute, setServiceToDispute] = useState<any>(null);
+  const [disputeDetails, setDisputeDetails] = useState("");
+
+  // Add new state for confirmation dialog
+  const [showConfirmationDialog, setShowConfirmationDialog] = useState(false);
+  const [bookingToConfirm, setBookingToConfirm] = useState<string | null>(null);
+
   // Initialize based on path
   useEffect(() => {
     const path = location.pathname;
@@ -262,6 +272,7 @@ export default function ServicesAndBookingsPage() {
       if (!data || data.length === 0) {
         setBookings([]);
         setFilteredBookings([]);
+        setPendingCompletionBookings([]); // Clear any pending completion bookings
         setLoadingBookings(false);
         return;
       }
@@ -280,6 +291,11 @@ export default function ServicesAndBookingsPage() {
         // If we can't fetch reviews, just set the bookings without reviews
         setBookings(data);
         setFilteredBookings(data);
+        
+        // Find bookings that need customer confirmation
+        const pendingCompletions = data.filter(booking => booking.status === "pending_completion");
+        setPendingCompletionBookings(pendingCompletions);
+        
         setLoadingBookings(false);
         return;
       }
@@ -292,6 +308,11 @@ export default function ServicesAndBookingsPage() {
       
       setBookings(enrichedBookings);
       setFilteredBookings(enrichedBookings);
+      
+      // Find bookings that need customer confirmation
+      const pendingCompletions = enrichedBookings.filter(booking => booking.status === "pending_completion");
+      setPendingCompletionBookings(pendingCompletions);
+      
       setLoadingBookings(false);
     } catch (error) {
       console.error("Error fetching bookings:", error);
@@ -674,8 +695,11 @@ export default function ServicesAndBookingsPage() {
 
   // Add this after the existing functions
   const countPendingConfirmations = () => {
-    if (!bookings) return 0;
-    return bookings.filter(booking => booking.status === "pending_completion").length;
+    if (!user || !bookings) return 0;
+    
+    return bookings.filter(
+      b => b.status === "pending_completion" && b.customer_id === user.id
+    ).length;
   };
 
   // Add this function to extract booking details from notes
@@ -693,14 +717,22 @@ export default function ServicesAndBookingsPage() {
     };
   };
 
-  // Function to handle confirming service completion
+  // Update the handleConfirmCompletion function to use the confirmation dialog
+  const handleConfirmClick = (bookingId: string) => {
+    setBookingToConfirm(bookingId);
+    setShowConfirmationDialog(true);
+  };
+
+  // Actual confirm completion function
   const handleConfirmCompletion = async (bookingId: string) => {
+    setConfirmationLoading(bookingId);
     try {
       // Update booking status to completed
       const { error } = await supabase
         .from('bookings')
         .update({ 
           status: "completed",
+          completion_date: new Date().toISOString(),
         })
         .eq('id', bookingId);
         
@@ -714,20 +746,27 @@ export default function ServicesAndBookingsPage() {
         .single();
         
       if (paymentData?.id) {
-        // In a real app, properly handle payment release here
-        console.log(`Payment ${paymentData.id} released for booking ${bookingId}`);
+        try {
+          await EscrowService.releasePayment(paymentData.id);
+        } catch (paymentError) {
+          console.error("Error releasing payment:", paymentError);
+          // Continue with completion even if payment release fails
+        }
       }
       
       // Send notification to provider
       const booking = bookings.find(b => b.id === bookingId);
       if (booking?.provider_id) {
-        await createNotification({
-          userId: booking.provider_id,
-          actorId: user?.id,
-          type: 'booking_completion',
-          message: `Customer has confirmed the completion of service "${booking.services?.title || 'your service'}"`,
-          linkType: 'booking',
-          linkId: bookingId
+        await supabase.from("notifications").insert({
+          user_id: booking.provider_id,
+          type: "booking_completion",
+          title: "Service Completed",
+          message: `The customer has confirmed completion of "${booking.services?.title || 'your service'}"`,
+          is_read: false,
+          data: JSON.stringify({
+            booking_id: bookingId,
+            service_id: booking.service_id
+          }),
         });
       }
       
@@ -736,13 +775,115 @@ export default function ServicesAndBookingsPage() {
       
       toast({
         title: "Service Completed",
-        description: "You have successfully confirmed the service completion",
+        description: "You have successfully confirmed the service completion. Payment has been released to the provider.",
       });
     } catch (error) {
       console.error("Error confirming completion:", error);
       toast({
         title: "Error",
         description: "Failed to confirm service completion. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setConfirmationLoading(null);
+      setBookingToConfirm(null);
+      setShowConfirmationDialog(false);
+    }
+  };
+
+  // Function to handle disputes for services marked as completed by provider
+  const handleDisputeService = async (booking: any) => {
+    setServiceToDispute(booking);
+    setShowDisputeServiceModal(true);
+  };
+
+  // Function to submit the dispute
+  const handleSubmitServiceDispute = async () => {
+    if (!serviceToDispute || !user) return;
+    
+    try {
+      // Update booking status to disputed
+      const { error } = await supabase
+        .from('bookings')
+        .update({ 
+          status: "disputed",
+          customer_feedback: disputeDetails
+        })
+        .eq('id', serviceToDispute.id);
+        
+      if (error) throw error;
+      
+      // Create dispute for the payment if exists
+      if (serviceToDispute.escrow_payments?.[0]?.id) {
+        try {
+          await EscrowService.createDispute(
+            serviceToDispute.escrow_payments[0].id,
+            "Customer disputed service completion",
+            disputeDetails || "Service was not completed satisfactorily",
+            user.id
+          );
+        } catch (disputeError) {
+          console.error("Error creating payment dispute:", disputeError);
+          // Continue even if dispute creation fails
+        }
+      }
+      
+      // Send notification to provider
+      if (serviceToDispute.provider_id) {
+        await supabase.from("notifications").insert({
+          user_id: serviceToDispute.provider_id,
+          type: "booking_dispute",
+          title: "Service Disputed",
+          message: `The customer has disputed the completion of "${serviceToDispute.services?.title || 'your service'}"`,
+          is_read: false,
+          data: JSON.stringify({
+            booking_id: serviceToDispute.id,
+            service_id: serviceToDispute.service_id
+          }),
+        });
+      }
+      
+      // Send notification to admin (in a real app, identify admins properly)
+      // This is simplified for the demo
+      const { data: adminData } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_role', 'admin')
+        .limit(1);
+        
+      if (adminData && adminData.length > 0) {
+        await supabase.from("notifications").insert({
+          user_id: adminData[0].id,
+          type: "admin_dispute",
+          title: "New Service Dispute",
+          message: `A customer has disputed service completion. Review required.`,
+          is_read: false,
+          data: JSON.stringify({
+            booking_id: serviceToDispute.id,
+            service_id: serviceToDispute.service_id,
+            customer_id: user.id,
+            provider_id: serviceToDispute.provider_id
+          }),
+        });
+      }
+      
+      // Update UI by refetching bookings
+      fetchBookings();
+      
+      toast({
+        title: "Dispute Filed",
+        description: "Your dispute has been filed. Our team will review it and contact you soon.",
+      });
+      
+      // Close modal and reset state
+      setShowDisputeServiceModal(false);
+      setServiceToDispute(null);
+      setDisputeDetails("");
+    } catch (error) {
+      console.error("Error filing dispute:", error);
+      toast({
+        title: "Error",
+        description: "Failed to file dispute. Please try again.",
         variant: "destructive",
       });
     }
@@ -848,27 +989,69 @@ export default function ServicesAndBookingsPage() {
             </div>
             
             {pendingCompletionBookings.length > 0 && (
-              <Card className="bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800">
-                <CardContent className="p-4">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 justify-between">
-                    <div className="flex items-start gap-3">
-                      <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-500 mt-0.5" />
-                      <div>
-                        <h4 className="font-medium text-yellow-800 dark:text-yellow-400">Service Completion Confirmation</h4>
-                        <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
-                          You have {pendingCompletionBookings.length} {pendingCompletionBookings.length === 1 ? 'service' : 'services'} that need your confirmation to complete.
-                        </p>
+              <Card className="bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800 mb-6">
+                <CardHeader>
+                  <CardTitle className="text-yellow-800 dark:text-yellow-400 flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5" />
+                    Action Required: {pendingCompletionBookings.length} {pendingCompletionBookings.length === 1 ? 'Service' : 'Services'} Awaiting Confirmation
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-yellow-700 dark:text-yellow-300">
+                    The service provider has marked {pendingCompletionBookings.length === 1 ? 'this service' : 'these services'} as completed. 
+                    Please confirm completion to release payment or file a dispute if the service was not completed satisfactorily.
+                  </p>
+                  
+                  <div className="space-y-4 mt-2">
+                    {pendingCompletionBookings.map(booking => (
+                      <div key={booking.id} className="border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 flex flex-col sm:flex-row gap-4 justify-between bg-white dark:bg-gray-900">
+                        <div>
+                          <h4 className="font-medium text-lg">{booking.services?.title}</h4>
+                          <div className="text-sm text-muted-foreground mt-1">
+                            <div className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              <span>{new Date(booking.updated_at || booking.created_at).toLocaleDateString()}</span>
+                            </div>
+                            {booking.provider && (
+                              <div className="flex items-center gap-1 mt-0.5">
+                                <User className="h-3 w-3" />
+                                <span>Provider: {booking.provider.username}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 self-end sm:self-center">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-red-600 text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30"
+                            onClick={() => handleDisputeService(booking)}
+                          >
+                            <ThumbsDown className="h-4 w-4 mr-1" />
+                            Dispute
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="default"
+                            className="bg-green-600 hover:bg-green-700"
+                            onClick={() => handleConfirmClick(booking.id)}
+                            disabled={confirmationLoading === booking.id}
+                          >
+                            {confirmationLoading === booking.id ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                                Confirming...
+                              </>
+                            ) : (
+                              <>
+                                <ThumbsUp className="h-4 w-4 mr-1" />
+                                Confirm Completion
+                              </>
+                            )}
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="border-yellow-600 text-yellow-700 hover:text-yellow-800 hover:bg-yellow-100 dark:text-yellow-400 dark:hover:text-yellow-300 dark:hover:bg-yellow-900/40"
-                      onClick={() => navigate(`/bookings/${pendingCompletionBookings[0].id}`)}
-                    >
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      View & Confirm
-                    </Button>
+                    ))}
                   </div>
                 </CardContent>
               </Card>
@@ -1215,6 +1398,104 @@ export default function ServicesAndBookingsPage() {
                     </>
                   ) : (
                     "Yes, Cancel Booking"
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Service Dispute Modal */}
+          <Dialog open={showDisputeServiceModal} onOpenChange={setShowDisputeServiceModal}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Dispute Service Completion</DialogTitle>
+                <DialogDescription>
+                  Let us know why you are disputing the completion of this service. Your payment will remain in escrow until this issue is resolved.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="space-y-2">
+                  <h4 className="font-medium">Service: {serviceToDispute?.services?.title}</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Provider: {serviceToDispute?.provider?.username}
+                  </p>
+                </div>
+                
+                <Textarea
+                  placeholder="Please explain why the service was not completed satisfactorily..."
+                  value={disputeDetails}
+                  onChange={(e) => setDisputeDetails(e.target.value)}
+                  className="min-h-32 mt-2"
+                />
+                
+                <Alert variant="warning">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTitle>Important</AlertTitle>
+                  <AlertDescription>
+                    Filing a dispute will initiate a review process. Our team will contact both you and the service provider to resolve this issue.
+                  </AlertDescription>
+                </Alert>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowDisputeServiceModal(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  variant="destructive" 
+                  onClick={handleSubmitServiceDispute}
+                  disabled={!disputeDetails.trim()}
+                >
+                  File Dispute
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Confirmation modal for completion */}
+          <Dialog open={showConfirmationDialog} onOpenChange={setShowConfirmationDialog}>
+            <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                <DialogTitle>Confirm Service Completion</DialogTitle>
+                <DialogDescription>
+                  By confirming, you acknowledge that the service has been completed satisfactorily. 
+                  Any payment held in escrow will be released to the service provider.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-5 w-5 text-green-500" />
+                  <p className="text-sm">
+                    This action cannot be undone. If you have any issues with the service, please use the Dispute button instead.
+                  </p>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => {
+                  setBookingToConfirm(null);
+                  setShowConfirmationDialog(false);
+                }}>
+                  Cancel
+                </Button>
+                <Button 
+                  variant="default" 
+                  className="bg-green-600 hover:bg-green-700"
+                  onClick={() => {
+                    if (bookingToConfirm) {
+                      handleConfirmCompletion(bookingToConfirm);
+                    }
+                  }}
+                  disabled={confirmationLoading === bookingToConfirm}
+                >
+                  {confirmationLoading === bookingToConfirm ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Confirming...
+                    </>
+                  ) : (
+                    <>
+                      <ThumbsUp className="mr-2 h-4 w-4" />
+                      Confirm Completion
+                    </>
                   )}
                 </Button>
               </DialogFooter>

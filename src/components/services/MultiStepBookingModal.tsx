@@ -39,6 +39,25 @@ import {
 } from "@/components/ui/dialog";
 import { useCurrency } from "@/contexts/CurrencyContext";
 
+// Add type declaration for Paystack
+declare global {
+  interface Window {
+    PaystackPop: {
+      setup: (config: {
+        key: string;
+        email: string;
+        amount: number;
+        currency: string;
+        ref: string;
+        callback: (response: any) => void;
+        onClose: () => void;
+      }) => {
+        openIframe: () => void;
+      };
+    };
+  }
+}
+
 interface MultiStepBookingModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -239,7 +258,7 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
         service_id: mainServiceId, // Use first service as main service
         customer_id: user.id,
         provider_id: providerId,
-        status: "pending", // Changed from "draft" to "pending"
+        status: "draft", // Change to "draft" so it requires payment to become active
         payment_status: "pending",
         notes: `Date: ${format(scheduledDateTime, "PPP")}\nTime: ${format(scheduledDateTime, "p")}\nLocation: ${values.location}${
           serviceIdsArray.length > 1 
@@ -249,7 +268,7 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
         total_price: finalPrice
       };
 
-      // Insert the booking
+      // Insert the booking as a draft
       const { data: newBooking, error: bookingError } = await supabase
         .from("bookings")
         .insert(bookingData)
@@ -265,8 +284,8 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
       }
 
       toast({
-        title: "Booking created",
-        description: "Your booking is being processed. Redirecting to payment...",
+        title: "Booking initiated",
+        description: "Redirecting to payment to complete your booking...",
       });
 
       // Close modal before redirecting
@@ -274,6 +293,7 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
       
       // Check if the user is in a supported country (for Paystack)
       const userCountry = await detectUserCountry();
+      console.log(`Detected user country: ${userCountry}`);
       
       // Directly redirect to payment page
       navigate(`/payment/${newBooking.id}`);
@@ -298,108 +318,45 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
     }
   };
 
-  // Function to detect user's country (simplified version - in production use proper geolocation service)
-  const detectUserCountry = async (): Promise<string> => {
-    try {
-      // In a real application, you would use a geolocation service or get from user profile
-      // For demo purposes, we'll assume Nigeria for now
-      return "NG"; // ISO country code for Nigeria
-    } catch (error) {
-      console.error("Error detecting user country:", error);
-      return "unknown";
-    }
-  };
-  
-  // Function to check if Paystack is supported in user's country
-  const isPaystackSupported = (countryCode: string): boolean => {
-    // List of countries where Paystack operates
-    const paystackSupportedCountries = ["NG", "GH", "ZA", "KE"];
-    return paystackSupportedCountries.includes(countryCode);
-  };
-  
-  // Function to initialize Paystack payment
-  const initializePaystackPayment = (bookingId: string, amount: number, email: string) => {
-    // This would be replaced with actual Paystack integration
-    console.log(`Initializing Paystack payment for booking ${bookingId} with amount ${amount}`);
-    
-    // In a real implementation, you would use Paystack's inline JS
-    // Example code for Paystack (would be implemented properly in production):
-    /*
-    const handler = PaystackPop.setup({
-      key: 'pk_test_your_public_key',
-      email: email,
-      amount: amount * 100, // Paystack amount is in kobo (100 kobo = 1 Naira)
-      currency: 'NGN',
-      ref: bookingId + '_' + new Date().getTime(),
-      callback: function(response) {
-        // Handle successful payment
-        window.location.href = `/payment/success/${bookingId}?reference=${response.reference}`;
-      },
-      onClose: function() {
-        // Handle payment cancellation
-        window.location.href = `/payment/cancel/${bookingId}`;
-      }
-    });
-    handler.openIframe();
-    */
-  };
-
-  const nextStep = () => {
-    // If current step is 2 (scheduling), check if location is filled
-    if (step === 2) {
-      const location = form.getValues("location");
-      if (!location || location.trim() === "") {
-        form.setError("location", { 
-          type: "manual", 
-          message: "Location is required to proceed" 
-        });
-        return;
-      }
-    }
-    
-    if (step < 4) {
-      setStep(step + 1);
-    }
-  };
-
-  const prevStep = () => {
-    // Reset intentional submit flag when moving between steps
-    intentionalSubmitRef.current = false;
-    
-    if (step > 1) {
-      setStep(step - 1);
-    }
-  };
-
   // Clean implementation of fixed fee structure for platform fees
   const getPlatformFee = (amount: number): number => {
+    console.log(`Calculating platform fee for amount: ${amount} in currency: ${currency}`);
+    
     // For Naira (NGN) currency
     if (currency === 'NGN') {
       // Fixed fee structure for Naira
-      if (amount <= 3000) return 100;
-      if (amount <= 6000) return 200;
-      if (amount <= 10000) return 300;
-      if (amount <= 20000) return 400;
-      if (amount <= 50000) return 500;
-      if (amount <= 100000) return 600;
-      if (amount <= 500000) return 800;
-      if (amount <= 1000000) return 1000;
-      if (amount <= 2000000) return 1500;
-      return 2000; // for 2 million and above
+      let fee = 0;
+      if (amount <= 3000) fee = 100;
+      else if (amount <= 6000) fee = 200;
+      else if (amount <= 10000) fee = 300;
+      else if (amount <= 20000) fee = 400;
+      else if (amount <= 50000) fee = 500;
+      else if (amount <= 100000) fee = 600;
+      else if (amount <= 500000) fee = 800;
+      else if (amount <= 1000000) fee = 1000;
+      else if (amount <= 2000000) fee = 1500;
+      else fee = 2000; // for 2 million and above
+      
+      console.log(`NGN fee calculated: ${fee} for amount ${amount}`);
+      return fee;
     }
     
     // For other currencies (USD, etc.)
     if (currency === 'USD') {
-      if (amount <= 2) return 0.07;
-      if (amount <= 4) return 0.13;
-      if (amount <= 7) return 0.20;
-      if (amount <= 15) return 0.27;
-      if (amount <= 35) return 0.33;
-      if (amount <= 70) return 0.40;
-      if (amount <= 350) return 0.53;
-      if (amount <= 700) return 0.67;
-      if (amount <= 1400) return 1.00;
-      return 1.33;
+      let fee = 0;
+      if (amount <= 2) fee = 0.07;
+      else if (amount <= 4) fee = 0.13;
+      else if (amount <= 7) fee = 0.20;
+      else if (amount <= 15) fee = 0.27;
+      else if (amount <= 35) fee = 0.33;
+      else if (amount <= 70) fee = 0.40;
+      else if (amount <= 350) fee = 0.53;
+      else if (amount <= 700) fee = 0.67;
+      else if (amount <= 1400) fee = 1.00;
+      else fee = 1.33;
+      
+      console.log(`USD fee calculated: ${fee} for amount ${amount}`);
+      return fee;
     }
     
     // Default fallback - use NGN structure if currency not specifically handled
@@ -407,16 +364,20 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
     const rate = exchangeRates[currency as keyof typeof exchangeRates] || 1;
     const amountInNgn = amount * rate;
     
-    if (amountInNgn <= 3000) return 100 / rate;
-    if (amountInNgn <= 6000) return 200 / rate;
-    if (amountInNgn <= 10000) return 300 / rate;
-    if (amountInNgn <= 20000) return 400 / rate;
-    if (amountInNgn <= 50000) return 500 / rate;
-    if (amountInNgn <= 100000) return 600 / rate;
-    if (amountInNgn <= 500000) return 800 / rate;
-    if (amountInNgn <= 1000000) return 1000 / rate;
-    if (amountInNgn <= 2000000) return 1500 / rate;
-    return 2000 / rate;
+    let fee = 0;
+    if (amountInNgn <= 3000) fee = 100 / rate;
+    else if (amountInNgn <= 6000) fee = 200 / rate;
+    else if (amountInNgn <= 10000) fee = 300 / rate;
+    else if (amountInNgn <= 20000) fee = 400 / rate;
+    else if (amountInNgn <= 50000) fee = 500 / rate;
+    else if (amountInNgn <= 100000) fee = 600 / rate;
+    else if (amountInNgn <= 500000) fee = 800 / rate;
+    else if (amountInNgn <= 1000000) fee = 1000 / rate;
+    else if (amountInNgn <= 2000000) fee = 1500 / rate;
+    else fee = 2000 / rate;
+    
+    console.log(`Converted fee calculated: ${fee} for amount ${amount} in ${currency} (converted from NGN)`);
+    return fee;
   };
 
   // Calculate final price with platform fee
@@ -626,7 +587,11 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
                   
                   <div className="pt-2 border-t border-border flex justify-between items-center font-medium">
                     <span>Total</span>
-                    <span>{formatPrice(getFinalPrice())}</span>
+                    <span>
+                      {currency === 'NGN' 
+                        ? `${symbol}${getTotalPrice() + getPlatformFee(getTotalPrice())}` 
+                        : formatPrice(getTotalPrice() + getPlatformFee(getTotalPrice()), 'USD')}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -672,7 +637,11 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
                   <h3 className="font-medium">Payment Information</h3>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Total Price: <span className="font-medium">{formatPrice(getFinalPrice(), 'USD')}</span>
+                  Total Price: <span className="font-medium">
+                    {currency === 'NGN' 
+                      ? `${symbol}${getTotalPrice() + getPlatformFee(getTotalPrice())}` 
+                      : formatPrice(getTotalPrice() + getPlatformFee(getTotalPrice()), 'USD')}
+                  </span>
                 </p>
                 <div className="flex items-center gap-1.5 text-sm text-primary">
                   <ShieldCheck className="h-3.5 w-3.5" />
@@ -701,13 +670,125 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
   const renderPlatformFeeInfo = () => {
     const totalPrice = getTotalPrice();
     const platformFee = getPlatformFee(totalPrice);
+    console.log("Platform fee value:", platformFee);
+    
+    // Format the platform fee based on the currency
+    let formattedFee;
+    if (currency === 'NGN') {
+      // For NGN, directly use the symbol and the fee without conversion
+      formattedFee = `${symbol}${platformFee}`;
+    } else {
+      // For other currencies, use the normal formatPrice function
+      formattedFee = formatPrice(platformFee);
+    }
+    
+    console.log("Formatted platform fee:", formattedFee);
     
     return (
       <div className="flex justify-between items-center text-sm text-muted-foreground">
         <span>Platform fee (fixed)</span>
-        <span>{formatPrice(platformFee)}</span>
+        <span>{formattedFee}</span>
       </div>
     );
+  };
+
+  // Function to detect user's country (simplified version - in production use proper geolocation service)
+  const detectUserCountry = async (): Promise<string> => {
+    try {
+      // First check if we have country info in the user profile
+      if (user) {
+        const { data: profileData, error } = await supabase
+          .from('profiles')
+          .select('country')
+          .eq('id', user.id)
+          .single();
+        
+        if (!error && profileData?.country) {
+          console.log(`Country from user profile: ${profileData.country}`);
+          return profileData.country;
+        }
+      }
+      
+      console.log(`No country in profile, defaulting to Nigeria for now`);
+      return "NG"; // Default to Nigeria if no country info available
+    } catch (error) {
+      console.error("Error detecting user country:", error);
+      return "NG"; // Default to Nigeria on error
+    }
+  };
+
+  // Function to check if Paystack is supported in user's country
+  const isPaystackSupported = (countryCode: string): boolean => {
+    // List of countries where Paystack operates
+    const paystackSupportedCountries = ["NG", "GH", "ZA", "KE"];
+    const isSupported = paystackSupportedCountries.includes(countryCode.toUpperCase());
+    console.log(`Is Paystack supported in ${countryCode}? ${isSupported}`);
+    return isSupported;
+  };
+
+  // Function to initialize Paystack payment
+  const initializePaystackPayment = (bookingId: string, amount: number, email: string) => {
+    if (typeof window.PaystackPop === 'undefined') {
+      console.error('PaystackPop not found. The Paystack script may not be loaded.');
+      toast({
+        title: "Payment Error",
+        description: "Unable to initialize payment. Please try again later.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    console.log(`Initializing Paystack payment for booking ${bookingId} with amount ${amount * 100}`);
+    
+    const handler = window.PaystackPop.setup({
+      key: 'pk_test_your_public_key', // Replace with your Paystack public key
+      email: email,
+      amount: amount * 100, // Paystack amount is in kobo (100 kobo = 1 Naira)
+      currency: currency === 'NGN' ? 'NGN' : 'USD', // Use NGN for Nigeria, USD for others
+      ref: `booking_${bookingId}_${new Date().getTime()}`,
+      callback: function(response: any) {
+        // Handle successful payment
+        console.log('Paystack payment successful:', response);
+        window.location.href = `/payment/success/${bookingId}?reference=${response.reference}&source=paystack`;
+      },
+      onClose: function() {
+        // Handle payment cancellation
+        console.log('Paystack payment window closed');
+        toast({
+          title: "Payment Cancelled",
+          description: "You have cancelled the payment process. Your booking is incomplete.",
+          variant: "destructive",
+        });
+      }
+    });
+    handler.openIframe();
+  };
+
+  const nextStep = () => {
+    // If current step is 2 (scheduling), check if location is filled
+    if (step === 2) {
+      const location = form.getValues("location");
+      if (!location || location.trim() === "") {
+        form.setError("location", { 
+          type: "manual", 
+          message: "Location is required to proceed" 
+        });
+        return;
+      }
+    }
+    
+    if (step < 4) {
+      setStep(step + 1);
+    }
+  };
+
+  const prevStep = () => {
+    // Reset intentional submit flag when moving between steps
+    intentionalSubmitRef.current = false;
+    
+    if (step > 1) {
+      setStep(step - 1);
+    }
   };
 
   return (
