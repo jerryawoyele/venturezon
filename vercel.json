@@ -6,4 +6,13 @@
       }
     ]
   }
+  {
+    "redirects": [
+      {
+        "source": "https://venturezon.com/:path*",
+        "destination": "https://www.venturezon.com/:path*",
+        "permanent": true
+      }
+    ]
+  }
   
