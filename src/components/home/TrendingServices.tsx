@@ -39,6 +39,7 @@ interface TrendingService {
   };
   image?: string;
   price?: number;
+  currency_created_in?: string;
   is_price_range?: boolean;
   bookingCount?: number;
   periodBookingCount?: number;
@@ -103,8 +104,8 @@ export function TrendingServices() {
       // Group bookings by service ID - only count completed and confirmed bookings for ranking
       const bookingsByService = (bookingsData || []).reduce((acc, booking) => {
         if (!booking.service_id) return acc;
-        // We only want to count valid bookings (confirmed, completed, pending_completion)
-        if (!['confirmed', 'completed', 'pending_completion'].includes(booking.status)) {
+        // We only want to count valid bookings (confirmed, completed, pending_completion, confirm_service)
+        if (!['confirmed', 'completed', 'pending_completion', 'confirm_service'].includes(booking.status)) {
           return acc;
         }
         if (!acc[booking.service_id]) {
@@ -143,6 +144,15 @@ export function TrendingServices() {
           bookingCount: totalBookingCount
         };
       }).sort((a, b) => b.bookingCount - a.bookingCount);
+      
+      // Log each service and its booking count for debugging
+      console.log("Services with booking counts:", 
+        servicesWithTotalBookings.map(service => ({
+          service_id: service.id,
+          title: service.title,
+          bookingCount: service.bookingCount
+        }))
+      );
       
       const topServicesByBookingCount = servicesWithTotalBookings.slice(0, 10);
       
@@ -398,7 +408,8 @@ export function TrendingServices() {
                         
                         <div className="absolute bottom-2 right-2 z-20">
                           <Badge variant="secondary" className="bg-background/80 dark:bg-black/60 hover:bg-background dark:hover:bg-black/80">
-                            {(service.bookingCount || 0) > 0 ? `${service.bookingCount} ${service.bookingCount === 1 ? 'booking' : 'bookings'}` : 'New'}
+                            {(service.bookingCount !== undefined && service.bookingCount > 0) ? 
+                              `${service.bookingCount} ${service.bookingCount === 1 ? 'booking' : 'bookings'}` : 'New'}
                           </Badge>
                         </div>
                       </div>
@@ -439,8 +450,8 @@ export function TrendingServices() {
                           <div className="text-primary font-medium">
                             {service.price 
                               ? service.is_price_range 
-                                ? `From ${formatPrice(service.price, 'USD')}`
-                                : formatPrice(service.price, 'USD')
+                                ? `From ${formatPrice(service.price, service.currency_created_in || 'USD')}`
+                                : formatPrice(service.price, service.currency_created_in || 'USD')
                               : 'Free'}
                           </div>
                           

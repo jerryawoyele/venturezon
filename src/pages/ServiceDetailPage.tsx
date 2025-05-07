@@ -39,16 +39,73 @@ import { EscrowService } from "@/utils/escrow-service";
 import { DeleteServiceModal } from "@/components/services/DeleteServiceModal";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { formatCurrency } from "@/lib/utils";
+import { BookNowButton } from "@/components/services/BookNowButton";
+
+// Add TypeScript interfaces for better type safety
+interface Service {
+  id: string;
+  title: string;
+  description: string;
+  price: number;
+  currency_created_in: string;
+  category: string;
+  image?: string;
+  owner_id: string;
+  is_verified?: boolean;
+  duration_minutes: number;
+  ratings_count: number;
+  ratings_sum: number;
+  location: string;
+  // Add any additional fields used in the component
+  [key: string]: any;
+}
+
+interface Provider {
+  id: string;
+  name?: string;
+  avatar_url?: string;
+  is_verified?: boolean;
+  username?: string;
+  kyc_verified?: boolean;
+  // Add any additional fields used in the component
+  [key: string]: any;
+}
+
+interface Review {
+  id: string;
+  customer_id: string;
+  service_id: string;
+  rating: number;
+  comment: string;
+  content?: string;
+  created_at: string;
+  customer?: {
+    name?: string;
+    avatar_url?: string;
+  };
+  reviewer?: {
+    name?: string;
+    avatar_url?: string;
+  };
+  // Add any additional fields used in the component
+  [key: string]: any;
+}
 
 // Create a simplified EscrowService for now
-const SimpleEscrowService = {
-  createEscrow: async (bookingId: string) => {
-    console.log(`Creating escrow for booking ${bookingId}`);
-    return { success: true };
+interface EscrowService {
+  releasePayment: (bookingId: string) => Promise<{ success: boolean; message: string }>;
+  requestRefund: (bookingId: string) => Promise<{ success: boolean; message: string }>;
+}
+
+const SimpleEscrowService: EscrowService = {
+  releasePayment: async (bookingId: string) => {
+    console.log(`Releasing payment for booking ${bookingId}`);
+    return { success: true, message: "Payment released successfully" };
   },
-  completeEscrow: async (bookingId: string) => {
-    console.log(`Completing escrow for booking ${bookingId}`);
-    return { success: true };
+  requestRefund: async (bookingId: string) => {
+    console.log(`Requesting refund for booking ${bookingId}`);
+    return { success: true, message: "Refund requested successfully" };
   }
 };
 
@@ -57,9 +114,9 @@ export default function ServiceDetailPage() {
   const { user } = useUser();
   const { toast } = useToast();
   const navigate = useNavigate();
-  const [service, setService] = useState<any>(null);
-  const [provider, setProvider] = useState<any>(null);
-  const [reviews, setReviews] = useState<any[]>([]);
+  const [service, setService] = useState<Service | null>(null);
+  const [provider, setProvider] = useState<Provider | null>(null);
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [userCanBook, setUserCanBook] = useState(false);
   const [showLocationData, setShowLocationData] = useState(false);
@@ -326,8 +383,7 @@ export default function ServiceDetailPage() {
       setLoadingBookings(true);
       console.log("Fetching bookings for service:", service.id);
 
-      // Fetch all bookings for this service regardless of user role
-      // This ensures booking counts are consistent for all users
+      // Fetch all bookings for this service 
       const { data, error } = await supabase
         .from('bookings')
         .select(`
@@ -338,7 +394,7 @@ export default function ServiceDetailPage() {
           ),
           escrow_payments(*)
         `)
-        .eq('service_id', service.id)
+        .eq('service_id', service.id)  // Ensure we're filtering by the correct service_id
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -346,23 +402,26 @@ export default function ServiceDetailPage() {
         throw error;
       }
       
-      console.log("Bookings fetched:", data?.length, data);
+      // Filter to valid bookings for display
+      const validBookings = data?.filter(booking => 
+        ['confirmed', 'completed', 'pending_completion', 'confirm_service'].includes(booking.status)
+      ) || [];
+      
+      console.log("Valid bookings for service", service.id, ":", validBookings.length);
       
       // For users who aren't the service owner, filter out sensitive data before setting state
-      if (user) {
+      if (user && service.owner_id === user.id) {
         // Service owner gets full booking details
-        setBookings(data || []);
+        setBookings(validBookings);
       } else {
         // For everyone else, just keep basic information needed for counts
-        const filteredData = data?.map(booking => ({
+        const filteredData = validBookings.map(booking => ({
           id: booking.id,
           created_at: booking.created_at,
           status: booking.status
-        })) || [];
+        }));
         setBookings(filteredData);
       }
-      
-      console.log("Bookings set in state:", data?.length);
     } catch (error) {
       console.error('Error fetching service bookings:', error);
       toast({
@@ -702,7 +761,7 @@ export default function ServiceDetailPage() {
               <div className="flex items-start justify-between mb-3">
                 <h1 className="text-3xl font-bold">{service.title}</h1>
                 <div className="flex items-center text-lg font-semibold">
-                  <span>{formatPrice(service.price, 'USD')}</span>
+                  <span>{formatCurrency(service.price, service.currency_created_in)}</span>
                 </div>
               </div>
 
@@ -766,7 +825,6 @@ export default function ServiceDetailPage() {
                               {bookings ? bookings.length : "0"}
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              {console.log("Rendering bookings count:", bookings?.length)}
                               {bookings && bookings.length > 0 
                                 ? `Last booking: ${formatDate(bookings[0]?.created_at || new Date().toISOString())}` 
                                 : "No bookings yet"}
@@ -1205,7 +1263,7 @@ export default function ServiceDetailPage() {
                                     {booking.escrow_payments?.[0] && (
                                       <div className="flex items-center gap-1">
                                         <span className="mr-1">{symbol}</span>
-                                        <span>Amount: {formatPrice(booking.escrow_payments[0].amount, 'USD')}</span>
+                                        <span>Amount: {formatCurrency(booking.escrow_payments[0].amount, booking.currency_created_in)}</span>
                                       </div>
                                     )}
                                   </>
@@ -1296,7 +1354,7 @@ export default function ServiceDetailPage() {
                               <div>
                                 <h3 className="font-medium">{service.title}</h3>
                                 <div className="flex items-center text-sm text-muted-foreground">
-                                  {formatPrice(service.price, 'USD')}
+                                  {formatCurrency(service.price, service.currency_created_in)}
                                 </div>
                               </div>
                             </div>
@@ -1313,13 +1371,10 @@ export default function ServiceDetailPage() {
                             </Alert>
                           )}
 
-                          <Button
-                            type="button"
-                            className="w-full"
-                            onClick={handleOpenBookingModal}
-                          >
-                            Book Now
-                          </Button>
+                          <BookNowButton 
+                            service={service} 
+                            onOpenModal={handleOpenBookingModal} 
+                          />
                         </div>
                       )}
                     </CardContent>

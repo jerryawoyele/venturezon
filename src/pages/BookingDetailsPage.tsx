@@ -647,13 +647,18 @@ export default function BookingDetailsPage() {
                 </div>
                 
                 <div className="flex items-center gap-2">
-                  <div className={`h-3 w-3 rounded-full ${booking.status === 'confirmed' ? 'bg-blue-500' : (booking.status === 'pending_completion' || booking.status === 'completed') ? 'bg-gray-300' : 'bg-gray-200'}`} />
+                  <div className={`h-3 w-3 rounded-full ${booking.status === 'confirmed' ? 'bg-blue-500' : (booking.status === 'pending_completion' || booking.status === 'confirm_service' || booking.status === 'completed') ? 'bg-gray-300' : 'bg-gray-200'}`} />
                   <span className={booking.status === 'confirmed' ? 'font-medium' : 'text-muted-foreground'}>Confirmed</span>
                 </div>
                 
                 <div className="flex items-center gap-2">
-                  <div className={`h-3 w-3 rounded-full ${booking.status === 'pending_completion' ? 'bg-blue-500' : booking.status === 'completed' ? 'bg-gray-300' : 'bg-gray-200'}`} />
+                  <div className={`h-3 w-3 rounded-full ${booking.status === 'pending_completion' ? 'bg-blue-500' : (booking.status === 'confirm_service' || booking.status === 'completed') ? 'bg-gray-300' : 'bg-gray-200'}`} />
                   <span className={booking.status === 'pending_completion' ? 'font-medium' : 'text-muted-foreground'}>Awaiting Confirmation</span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <div className={`h-3 w-3 rounded-full ${booking.status === 'confirm_service' ? 'bg-blue-500' : booking.status === 'completed' ? 'bg-gray-300' : 'bg-gray-200'}`} />
+                  <span className={booking.status === 'confirm_service' ? 'font-medium' : 'text-muted-foreground'}>Ready For Confirmation</span>
                 </div>
                 
                 <div className="flex items-center gap-2">

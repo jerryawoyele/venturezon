@@ -3,7 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 import { Stripe } from 'https://esm.sh/stripe@12.1.1';
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': 'https://venturezon.vercel.app http://localhost:8080',
+  'Access-Control-Allow-Origin': 'https://venturezon.com http://localhost:8080',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS, GET',
   'Access-Control-Max-Age': '86400',

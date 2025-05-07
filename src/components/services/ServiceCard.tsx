@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, formatCurrency } from "@/lib/utils";
 import { Clock, MapPin, MoreVertical, Star } from "lucide-react";
 import {
   DropdownMenu,
@@ -23,6 +23,7 @@ interface ServiceCardProps {
     description: string;
     category: string;
     price: number;
+    currency_created_in: string;
     location: string;
     duration_minutes: number;
     image: string | null;
@@ -141,7 +142,11 @@ export function ServiceCard({ service, showOptions = false, onDelete, refreshSer
             <Badge className={`${getCategoryColor(service.category)} text-white`}>
               {service.category.charAt(0).toUpperCase() + service.category.slice(1)}
             </Badge>
-            <span className="font-semibold text-lg">{formatPrice(service.price, 'USD')}</span>
+            <div className="flex justify-between items-center">
+              <p className="text-xl font-bold">
+                {formatCurrency(service.price, service.currency_created_in)}
+              </p>
+            </div>
           </div>
           <h3 className="font-bold text-xl mb-2 line-clamp-1">{service.title}</h3>
           <p className="text-gray-500 dark:text-gray-400 mb-4 text-sm line-clamp-2">

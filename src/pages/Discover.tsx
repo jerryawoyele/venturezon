@@ -20,6 +20,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, DollarSign, Clock, Star, HeartIcon } from "lucide-react";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { formatCurrency } from "@/lib/utils";
 
 interface Post {
   id: string;
@@ -51,6 +52,7 @@ interface Service {
     username: string | null;
     avatar_url: string | null;
   };
+  currency_created_in: string;
 }
 
 export default function Discover() {
@@ -548,7 +550,7 @@ export default function Discover() {
                           <CardContent className="p-4">
                             <div className="flex flex-col xs:flex-row xs:items-start xs:justify-between mb-2">
                               <h3 className="font-semibold text-lg mb-1 xs:mb-0">{service.title}</h3>
-                              <span className="font-medium text-primary whitespace-nowrap">{formatPrice(service.price, 'USD')}</span>
+                              <span className="font-medium text-primary whitespace-nowrap">{formatCurrency(service.price, service.currency_created_in)}</span>
                             </div>
                             <p className="text-sm text-muted-foreground line-clamp-2 mb-4">
                               {service.description}

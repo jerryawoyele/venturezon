@@ -23,11 +23,13 @@ interface AddServiceModalProps {
 
 const formSchema = z.object({
   title: z.string().min(2, "Title must be at least 2 characters").max(100),
-  description: z.string().min(10, "Description must be at least 10 characters").max(500),
-  category: z.string().min(1, "Please select a category"),
-  price: z.coerce.number().positive("Price must be positive"),
-  location: z.string().min(2, "Location must be at least 2 characters").max(100),
-  duration: z.coerce.number().positive("Duration must be positive").max(24, "Duration cannot exceed 24 hours"),
+  description: z.string().min(20, "Description must be at least 20 characters"),
+  price: z.number().min(0, "Price must be a non-negative number"),
+  currency_created_in: z.string().default("NGN"),
+  category: z.string().min(2, "Please select a category"),
+  location: z.string().min(2, "Location must be at least 2 characters"),
+  is_price_range: z.boolean().default(false).optional(),
+  duration_minutes: z.number().min(1, "Duration must be at least 1 minute"),
 });
 
 // Try these buckets in order
@@ -62,10 +64,12 @@ export function AddServiceModal({ isOpen, onClose, onServiceAdded }: AddServiceM
     defaultValues: {
       title: "",
       description: "",
-      category: "",
       price: 0,
+      currency_created_in: "NGN",
+      category: "",
       location: "",
-      duration: 1,
+      is_price_range: false,
+      duration_minutes: 60,
     },
   });
 
@@ -195,24 +199,26 @@ export function AddServiceModal({ isOpen, onClose, onServiceAdded }: AddServiceM
         }
       }
 
-      // Convert hours to minutes for the database
-      const durationMinutes = Math.round(values.duration * 60);
+      // Prepare service data
+      const serviceData = {
+        title: values.title,
+        description: values.description,
+        price: values.price,
+        currency_created_in: values.currency_created_in,
+        category: values.category,
+        location: values.location,
+        is_price_range: values.is_price_range,
+        duration_minutes: values.duration_minutes,
+        owner_id: user.id,
+        image: imageUrl,
+        ratings_count: 0,
+        ratings_sum: 0,
+      };
 
       // Insert into the services table
       const { data, error } = await supabase
         .from("services")
-        .insert({
-          title: values.title,
-          description: values.description,
-          category: values.category,
-          price: values.price,
-          location: values.location,
-          duration_minutes: durationMinutes,
-          image: imageUrl,
-          owner_id: user.id,
-          ratings_count: 0,
-          ratings_sum: 0,
-        })
+        .insert(serviceData)
         .select()
         .single();
 
@@ -321,17 +327,40 @@ export function AddServiceModal({ isOpen, onClose, onServiceAdded }: AddServiceM
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="price">Price ($)</Label>
-                <Input
-                  id="price"
-                  type="number"
-                  placeholder="99.99"
-                  step="0.01"
-                  min="0"
-                  {...register("price")}
-                />
+                <Label htmlFor="price">Price</Label>
+                <div className="flex">
+                  <Input
+                    id="price"
+                    type="number"
+                    placeholder="0.00"
+                    {...form.register("price", { valueAsNumber: true })}
+                  />
+                </div>
                 {errors.price && (
                   <p className="text-sm text-red-500">{errors.price.message}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div className="space-y-2">
+                <Label htmlFor="currency_created_in">Currency</Label>
+                <Select
+                  onValueChange={(value) => form.setValue("currency_created_in", value)}
+                  defaultValue={form.getValues("currency_created_in")}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Currency" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="NGN">Nigerian Naira (NGN)</SelectItem>
+                    <SelectItem value="USD">US Dollar (USD)</SelectItem>
+                    <SelectItem value="GBP">British Pound (GBP)</SelectItem>
+                    <SelectItem value="EUR">Euro (EUR)</SelectItem>
+                  </SelectContent>
+                </Select>
+                {errors.currency_created_in && (
+                  <p className="text-sm text-red-500">{errors.currency_created_in.message}</p>
                 )}
               </div>
             </div>
@@ -350,18 +379,18 @@ export function AddServiceModal({ isOpen, onClose, onServiceAdded }: AddServiceM
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="duration">Duration (hours)</Label>
+                <Label htmlFor="duration_minutes">Duration (minutes)</Label>
                 <Input
-                  id="duration"
+                  id="duration_minutes"
                   type="number"
-                  placeholder="1"
-                  step="0.5"
-                  min="0.5"
-                  max="24"
-                  {...register("duration")}
+                  placeholder="60"
+                  step="1"
+                  min="1"
+                  max="1440"
+                  {...register("duration_minutes")}
                 />
-                {errors.duration && (
-                  <p className="text-sm text-red-500">{errors.duration.message}</p>
+                {errors.duration_minutes && (
+                  <p className="text-sm text-red-500">{errors.duration_minutes.message}</p>
                 )}
               </div>
             </div>

@@ -9,7 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
+import { cn, convertCurrency, formatCurrency } from "@/lib/utils";
 import { format } from "date-fns";
 import { 
   CalendarIcon, 
@@ -38,6 +38,7 @@ import {
   DialogDescription
 } from "@/components/ui/dialog";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { FIXED_PLATFORM_FEE } from "@/lib/constants";
 
 // Add type declaration for Paystack
 declare global {
@@ -134,10 +135,11 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
           id,
           service_id,
           status,
-          payment_status
+          payment_status,
+          notes
         `)
         .eq("customer_id", user.id)
-        .in("status", ["pending", "confirmed", "in_progress"])
+        .in("status", ["pending", "confirmed", "in_progress"]) // Exclude "draft" status
         .not("payment_status", "eq", "refunded");
         
       if (error) throw error;
@@ -145,14 +147,71 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
       if (bookings && bookings.length > 0) {
         setActiveBookings(bookings);
         
-        // Check if current service is already booked
-        if (currentService && bookings.some(booking => booking.service_id === currentService.id)) {
-          toast({
-            title: "Service already booked",
-            description: "You already have an active booking for this service. Please wait until it's completed or cancelled before booking again.",
-            variant: "destructive",
-          });
-          onClose();
+
+      }
+
+      // Check for any draft bookings for the current service to pre-fill the form
+      if (currentService) {
+        const { data: draftBookings, error: draftError } = await supabase
+          .from("bookings")
+          .select(`
+            id,
+            service_id,
+            notes,
+            status
+          `)
+          .eq("customer_id", user.id)
+          .eq("service_id", currentService.id)
+          .eq("status", "draft")
+          .order("created_at", { ascending: false })
+          .limit(1);
+          
+        if (!draftError && draftBookings && draftBookings.length > 0) {
+          const draftBooking = draftBookings[0];
+          console.log("Found draft booking:", draftBooking);
+          
+          // Parse notes to extract booking details
+          if (draftBooking.notes) {
+            const bookingDetails = extractBookingDetails(draftBooking.notes);
+            
+            // Pre-fill the form with saved data
+            if (bookingDetails.date) {
+              try {
+                const parsedDate = new Date(bookingDetails.date);
+                if (!isNaN(parsedDate.getTime())) {
+                  form.setValue("date", parsedDate);
+                }
+              } catch (e) {
+                console.error("Error parsing date from draft booking:", e);
+              }
+            }
+            
+            if (bookingDetails.time) {
+              form.setValue("time", bookingDetails.time);
+            }
+            
+            if (bookingDetails.location) {
+              form.setValue("location", bookingDetails.location);
+            }
+            
+            if (bookingDetails.notes) {
+              form.setValue("notes", bookingDetails.notes);
+            }
+
+            // If there are additional services, set them
+            if (bookingDetails.additionalServices) {
+              const serviceIds = [currentService.id, ...bookingDetails.additionalServices.split(',').map(id => id.trim())];
+              form.setValue("serviceIds", serviceIds);
+            }
+            
+            // Set step to review step since we have the data
+            setStep(3);
+            
+            toast({
+              title: "Draft booking found",
+              description: "We've loaded your previous booking information. You can review and continue.",
+            });
+          }
         }
       }
     } catch (error) {
@@ -160,6 +219,25 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
     } finally {
       setCheckingActiveBookings(false);
     }
+  };
+
+  // Extract booking details from notes
+  const extractBookingDetails = (notes: string) => {
+    if (!notes) return { date: null, time: null, location: null, notes: null, additionalServices: null };
+
+    const dateMatch = notes.match(/Date: (.+?)(?:\n|$)/);
+    const timeMatch = notes.match(/Time: (.+?)(?:\n|$)/);
+    const locationMatch = notes.match(/Location: (.+?)(?:\n|$)/);
+    const additionalServicesMatch = notes.match(/Additional Services: (.+?)(?:\n|$)/);
+    const notesMatch = notes.match(/Additional Notes: (.+?)(?:\n|$)/);
+
+    return {
+      date: dateMatch ? dateMatch[1] : null,
+      time: timeMatch ? timeMatch[1] : null,
+      location: locationMatch ? locationMatch[1] : null,
+      additionalServices: additionalServicesMatch ? additionalServicesMatch[1] : null,
+      notes: notesMatch ? notesMatch[1] : null
+    };
   };
 
   // Fetch all services from the same provider
@@ -214,19 +292,36 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
     
     // Check if any selected service is already booked
     const selectedServiceIds = form.getValues("serviceIds");
-    const alreadyBookedServices = services.filter(service => 
+    
+    // First, check the cached activeBookings that were loaded at modal open
+    let alreadyBookedServices = services.filter(service => 
       selectedServiceIds.includes(service.id) && 
       activeBookings.some(booking => booking.service_id === service.id)
     );
     
-    if (alreadyBookedServices.length > 0) {
-      toast({
-        title: "Service already booked",
-        description: `You already have active bookings for: ${alreadyBookedServices.map(s => s.title).join(", ")}. Please wait until they're completed or cancelled.`,
-        variant: "destructive",
-      });
-      return;
+    // If we don't find any active bookings in the cache, do a fresh check
+    // This helps in case the user has been in the modal for a while
+    if (alreadyBookedServices.length === 0 && user) {
+      try {
+        const { data: existingBookings, error: bookingsError } = await supabase
+          .from("bookings")
+          .select("service_id, services(title)")
+          .eq("customer_id", user.id)
+          .in("status", ["pending", "confirmed", "in_progress"]) // Exclude "draft" status
+          .in("service_id", selectedServiceIds);
+
+        if (!bookingsError && existingBookings && existingBookings.length > 0) {
+          alreadyBookedServices = existingBookings.map(booking => ({
+            id: booking.service_id,
+            title: booking.services.title
+          }));
+        }
+      } catch (error) {
+        console.error("Error checking for active bookings:", error);
+      }
     }
+    
+   
 
     setIsSubmitting(true);
 
@@ -249,9 +344,8 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
       }
 
       // Calculate platform fee and final price
-      const subtotal = getTotalPrice();
-      const platformFee = getPlatformFee(subtotal);
-      const finalPrice = subtotal + platformFee;
+      const { baseTotal, fee, total } = getTotalPrice();
+      console.log(`Final price calculation: totalPrice=${baseTotal}, platformFee=${fee}, finalPrice=${total}`);
 
       // Create booking data object first to validate
       const bookingData = {
@@ -265,7 +359,7 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
             ? `\n\nAdditional Services: ${serviceIdsArray.slice(1).join(", ")}` 
             : ""
         }${values.notes ? `\n\nAdditional Notes: ${values.notes}` : ""}`,
-        total_price: finalPrice
+        total_price: total
       };
 
       // Insert the booking as a draft
@@ -318,73 +412,15 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
     }
   };
 
-  // Clean implementation of fixed fee structure for platform fees
-  const getPlatformFee = (amount: number): number => {
-    console.log(`Calculating platform fee for amount: ${amount} in currency: ${currency}`);
-    
-    // For Naira (NGN) currency
-    if (currency === 'NGN') {
-      // Fixed fee structure for Naira
-      let fee = 0;
-      if (amount <= 3000) fee = 100;
-      else if (amount <= 6000) fee = 200;
-      else if (amount <= 10000) fee = 300;
-      else if (amount <= 20000) fee = 400;
-      else if (amount <= 50000) fee = 500;
-      else if (amount <= 100000) fee = 600;
-      else if (amount <= 500000) fee = 800;
-      else if (amount <= 1000000) fee = 1000;
-      else if (amount <= 2000000) fee = 1500;
-      else fee = 2000; // for 2 million and above
-      
-      console.log(`NGN fee calculated: ${fee} for amount ${amount}`);
-      return fee;
-    }
-    
-    // For other currencies (USD, etc.)
-    if (currency === 'USD') {
-      let fee = 0;
-      if (amount <= 2) fee = 0.07;
-      else if (amount <= 4) fee = 0.13;
-      else if (amount <= 7) fee = 0.20;
-      else if (amount <= 15) fee = 0.27;
-      else if (amount <= 35) fee = 0.33;
-      else if (amount <= 70) fee = 0.40;
-      else if (amount <= 350) fee = 0.53;
-      else if (amount <= 700) fee = 0.67;
-      else if (amount <= 1400) fee = 1.00;
-      else fee = 1.33;
-      
-      console.log(`USD fee calculated: ${fee} for amount ${amount}`);
-      return fee;
-    }
-    
-    // Default fallback - use NGN structure if currency not specifically handled
-    const exchangeRates = { NGN: 1, USD: 1500 }; // Simplified rate table
-    const rate = exchangeRates[currency as keyof typeof exchangeRates] || 1;
-    const amountInNgn = amount * rate;
-    
-    let fee = 0;
-    if (amountInNgn <= 3000) fee = 100 / rate;
-    else if (amountInNgn <= 6000) fee = 200 / rate;
-    else if (amountInNgn <= 10000) fee = 300 / rate;
-    else if (amountInNgn <= 20000) fee = 400 / rate;
-    else if (amountInNgn <= 50000) fee = 500 / rate;
-    else if (amountInNgn <= 100000) fee = 600 / rate;
-    else if (amountInNgn <= 500000) fee = 800 / rate;
-    else if (amountInNgn <= 1000000) fee = 1000 / rate;
-    else if (amountInNgn <= 2000000) fee = 1500 / rate;
-    else fee = 2000 / rate;
-    
-    console.log(`Converted fee calculated: ${fee} for amount ${amount} in ${currency} (converted from NGN)`);
-    return fee;
+  // Use the fixed platform fee from constants
+  const getPlatformFee = (): number => {
+    return FIXED_PLATFORM_FEE[currency] || 100;
   };
 
   // Calculate final price with platform fee
   const getFinalPrice = () => {
-    const totalPrice = getTotalPrice();
-    const platformFee = getPlatformFee(totalPrice);
-    return totalPrice + platformFee;
+    const { total } = getTotalPrice();
+    return total;
   };
 
   const handleToggleService = (serviceId: string) => {
@@ -410,10 +446,38 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
   };
 
   const getTotalPrice = () => {
-    const serviceIds = form.getValues("serviceIds") || [];
-    return services
-      .filter(service => serviceIds.includes(service.id))
-      .reduce((total, service) => total + (service.price || 0), 0);
+    let totalBasePrice = 0;
+    
+    // Process each selected service
+    const selectedServices = services.filter(service => form.getValues("serviceIds")?.includes(service.id));
+    selectedServices.forEach(service => {
+      const servicePrice = service.price;
+      const serviceCurrency = service.currency_created_in || "NGN";
+      
+      console.log(`Service: ${service.title}, Price: ${formatCurrency(servicePrice, serviceCurrency)}`);
+      
+      // If display currency matches service currency, use the price directly
+      if (currency === serviceCurrency) {
+        totalBasePrice += servicePrice;
+        console.log(`No conversion needed for ${service.title}`);
+      } 
+      // If display currency is different, convert the price
+      else {
+        const convertedPrice = convertCurrency(servicePrice, serviceCurrency, currency);
+        totalBasePrice += convertedPrice;
+        console.log(`Converted ${formatCurrency(servicePrice, serviceCurrency)} to ${formatCurrency(convertedPrice, currency)}`);
+      }
+    });
+    
+    // Add platform fee
+    const platformFee = getPlatformFee();
+    const totalWithFee = totalBasePrice + platformFee;
+    
+    console.log(`Total base price: ${formatCurrency(totalBasePrice, currency)}`);
+    console.log(`Platform fee: ${formatCurrency(platformFee, currency)}`);
+    console.log(`Total with fee: ${formatCurrency(totalWithFee, currency)}`);
+    
+    return { baseTotal: totalBasePrice, fee: platformFee, total: totalWithFee };
   };
 
   const renderStepContent = () => {
@@ -465,7 +529,7 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
                           </div>
                         </div>
                         <div className="text-lg font-semibold text-primary">
-                          {formatPrice(service.price)}
+                          {formatCurrency(service.price, service.currency_created_in)}
                         </div>
                       </CardContent>
                     </Card>
@@ -481,7 +545,9 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
               </div>
               <div className="flex justify-between items-center px-1 mt-1">
                 <span className="font-medium">Total:</span>
-                <span className="text-lg font-semibold">{formatPrice(getTotalPrice())}</span>
+                <span className="text-lg font-semibold">
+                  {formatCurrency(getTotalPrice().baseTotal, currency)}
+                </span>
               </div>
             </div>
           </div>
@@ -573,13 +639,13 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
                     .map(service => (
                       <div key={service.id} className="flex justify-between items-center">
                         <span>{service.title}</span>
-                        <span>{formatPrice(service.price)}</span>
+                        <span>{formatCurrency(service.price, service.currency_created_in)}</span>
                       </div>
                     ))
                   }
                   <div className="pt-2 border-t border-border flex justify-between items-center">
                     <span>Subtotal</span>
-                    <span>{formatPrice(getTotalPrice())}</span>
+                    <span>{formatCurrency(getTotalPrice().baseTotal, currency)}</span>
                   </div>
                   
                   {renderPlatformFeeInfo()}
@@ -587,9 +653,7 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
                   <div className="pt-2 border-t border-border flex justify-between items-center font-medium">
                     <span>Total</span>
                     <span>
-                      {currency === 'NGN' 
-                        ? `${symbol}${getTotalPrice() + getPlatformFee(getTotalPrice())}` 
-                        : formatPrice(getTotalPrice() + getPlatformFee(getTotalPrice()), 'USD')}
+                      {formatCurrency(getTotalPrice().total, currency)}
                     </span>
                   </div>
                 </div>
@@ -637,9 +701,7 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
                 </div>
                 <p className="text-sm text-muted-foreground">
                   Total Price: <span className="font-medium">
-                    {currency === 'NGN' 
-                      ? `${symbol}${getTotalPrice() + getPlatformFee(getTotalPrice())}` 
-                      : formatPrice(getTotalPrice() + getPlatformFee(getTotalPrice()), 'USD')}
+                    {formatCurrency(getTotalPrice().total, currency)}
                   </span>
                 </p>
                 <div className="flex items-center gap-1.5 text-sm text-primary">
@@ -667,26 +729,13 @@ export function MultiStepBookingModal({ isOpen, onClose, currentService, provide
 
   // Simple helper to render platform fee info consistently
   const renderPlatformFeeInfo = () => {
-    const totalPrice = getTotalPrice();
-    const platformFee = getPlatformFee(totalPrice);
-    console.log("Platform fee value:", platformFee);
-    
-    // Format the platform fee based on the currency
-    let formattedFee;
-    if (currency === 'NGN') {
-      // For NGN, directly use the symbol and the fee without conversion
-      formattedFee = `${symbol}${platformFee}`;
-    } else {
-      // For other currencies, use the normal formatPrice function
-      formattedFee = formatPrice(platformFee);
-    }
-    
-    console.log("Formatted platform fee:", formattedFee);
+    const fee = getTotalPrice().fee;
+    console.log("Platform fee value:", fee);
     
     return (
       <div className="flex justify-between items-center text-sm text-muted-foreground">
         <span>Platform fee (fixed)</span>
-        <span>{formattedFee}</span>
+        <span>{formatCurrency(fee, currency)}</span>
       </div>
     );
   };

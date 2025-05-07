@@ -41,6 +41,7 @@ import { MainLayout } from "@/layouts/MainLayout";
 import { ServiceDashboard } from "@/components/services/ServiceDashboard";
 import { AddServiceModal } from "@/components/services/AddServiceModal";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { formatCurrency } from "@/lib/utils";
 
 export default function ServicesAndBookingsPage() {
   const location = useLocation();
@@ -1163,7 +1164,7 @@ export default function ServicesAndBookingsPage() {
                       
                       <div className="flex items-center gap-1 text-sm">
                         <span className="text-muted-foreground">{symbol}</span>
-                        <span>{formatPrice(booking.services?.price, 'USD')}</span>
+                        <span>{formatCurrency(booking.services?.price, booking.services?.currency_created_in)}</span>
                       </div>
                     </div>
                     
@@ -1200,7 +1201,7 @@ export default function ServicesAndBookingsPage() {
                       </Button>
                     )}
                     
-                    {booking.status === "pending_completion" && (
+                    {(booking.status === "pending_completion" || booking.status === "confirm_service") && (
                       <Button 
                         variant="default" 
                         size="sm" 

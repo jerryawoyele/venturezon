@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,8 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCurrency } from "@/contexts/CurrencyContext";
+import { convertCurrency, formatCurrency } from "@/lib/utils";
+import { FIXED_PLATFORM_FEE } from "@/lib/constants";
 
 // Add PaystackPop type definition
 declare global {
@@ -38,7 +40,7 @@ declare global {
         amount: number;
         currency: string;
         ref: string;
-        callback: (response: any) => void;
+        callback: (response: PaystackResponse) => void;
         onClose: () => void;
       }) => {
         openIframe: () => void;
@@ -53,8 +55,8 @@ const PAYSTACK_CHECKOUT_URL = "/api/create-paystack-session";
 
 // Countries where Paystack is available
 const PAYSTACK_SUPPORTED_COUNTRIES = [
-  "nigeria", "ghana", "kenya", "south africa", "uganda", 
-  "tanzania", "rwanda", "mauritius", "malawi", "ethiopia"
+  "nigeria", "NIGERIA", "NG", "ghana", "GHANA", "GH", "kenya", "KENYA", "KE", 
+  "south africa", "SOUTH AFRICA", "ZA", "uganda", "tanzania", "rwanda", "mauritius", "malawi", "ethiopia"
 ];
 
 // Test countries for dropdown
@@ -69,6 +71,34 @@ const TEST_COUNTRIES = [
 // Local storage key for saving country preference
 const COUNTRY_STORAGE_KEY = "ventureezon_test_country";
 
+// Add proper type definitions
+interface Service {
+  id: string;
+  title: string;
+  description: string;
+  price: number;
+  currency_created_in: string;
+  owner_id: string;
+  [key: string]: any; // For other properties we're not specifically using
+}
+
+interface PaymentFormData {
+  fullName: string;
+  email: string;
+  phoneNumber: string;
+  paymentMethod: string;
+}
+
+// Add type definition for Paystack response
+interface PaystackResponse {
+  reference: string;
+  status: string;
+  trans: string;
+  transaction: string;
+  message: string;
+  [key: string]: any;
+}
+
 export default function PaymentPage() {
   const { bookingId } = useParams<{ bookingId: string }>();
   const navigate = useNavigate();
@@ -78,7 +108,7 @@ export default function PaymentPage() {
   const [loading, setLoading] = useState(true);
   const [processingPayment, setProcessingPayment] = useState(false);
   const [booking, setBooking] = useState<any>(null);
-  const [service, setService] = useState<any>(null);
+  const [service, setService] = useState<Service | null>(null);
   const [provider, setProvider] = useState<any>(null);
   const [paymentComplete, setPaymentComplete] = useState(false);
   const [escrowPayment, setEscrowPayment] = useState<any>(null);
@@ -88,6 +118,16 @@ export default function PaymentPage() {
   const [preferredGateway, setPreferredGateway] = useState<'stripe' | 'paystack'>('stripe');
   const [detectingLocation, setDetectingLocation] = useState(true);
   const { formatPrice, symbol, currency } = useCurrency();
+  const [subtotal, setSubtotal] = useState(0);
+  const [fee, setFee] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [formData, setFormData] = useState<PaymentFormData>({
+    fullName: "",
+    email: "",
+    phoneNumber: "",
+    paymentMethod: "card",
+  });
 
   // Add a useEffect to track when the user data is loaded
   useEffect(() => {
@@ -101,6 +141,19 @@ export default function PaymentPage() {
   const fetchUserCountry = async () => {
     setDetectingLocation(true);
     try {
+      // Nigeria-specific detection as fallback
+      const isNigeria = 
+        navigator.languages?.some(lang => lang.includes('NG') || lang.includes('ng')) ||
+        Intl.DateTimeFormat().resolvedOptions().timeZone?.includes('Lagos') ||
+        window.location.hostname.endsWith('.ng');
+      
+      if (isNigeria) {
+        console.log("Nigeria detected by browser data");
+        handleCountryDetected("nigeria");
+        setDetectingLocation(false);
+        return;
+      }
+      
       // Try to get country from user profile
       const { data: profileData, error } = await supabase
         .from('profiles')
@@ -111,8 +164,18 @@ export default function PaymentPage() {
       if (!error && profileData?.country) {
         handleCountryDetected(profileData.country.toLowerCase());
       } else {
-        // Default to Stripe if country detection fails
-        setPreferredGateway('stripe');
+        // Force Paystack in development for testing if query param is present
+        const urlParams = new URLSearchParams(window.location.search);
+        const forcePaystack = urlParams.get('forcePaystack');
+        
+        if (forcePaystack === 'true') {
+          console.log("Forcing Paystack due to URL parameter");
+          handleCountryDetected("nigeria");
+        } else {
+          // Default to Stripe if country detection fails
+          console.log("No country detected, defaulting to Stripe");
+          setPreferredGateway('stripe');
+        }
       }
     } catch (error) {
       console.error("Error detecting country:", error);
@@ -125,12 +188,19 @@ export default function PaymentPage() {
 
   // Handle detected country
   const handleCountryDetected = (country: string) => {
+    console.log("Country detected:", country);
     setUserCountry(country);
     
+    // Normalize country for comparison
+    const normalizedCountry = country.toLowerCase();
+    
     // Set preferred gateway based on country
-    if (PAYSTACK_SUPPORTED_COUNTRIES.includes(country)) {
+    if (PAYSTACK_SUPPORTED_COUNTRIES.includes(normalizedCountry) || 
+        PAYSTACK_SUPPORTED_COUNTRIES.includes(country)) {
+      console.log("Paystack is supported in this country:", country);
       setPreferredGateway('paystack');
     } else {
+      console.log("Paystack not supported in this country - using Stripe:", country);
       setPreferredGateway('stripe');
     }
   };
@@ -274,6 +344,59 @@ export default function PaymentPage() {
     setProcessingPayment(true);
 
     try {
+      // Since Stripe is not available, show a message and set appropriate status
+      toast({
+        title: "Payment Option Not Available",
+        description: "Stripe payments are not currently available. Please try another payment method or contact support.",
+        variant: "destructive",
+      });
+      
+      // Create a notification for the service provider about pending payment
+      try {
+        await supabase.from("notifications").insert({
+          user_id: booking.provider_id, // Send to service provider
+          type: "booking_pending",
+          title: "New Booking - Payment Pending",
+          message: `A customer has attempted to book your service "${service.title}" but payment is pending.`,
+          is_read: false,
+          data: JSON.stringify({
+            booking_id: booking.id,
+            service_id: service.id,
+            service_title: service.title,
+            payment_status: "pending"
+          }),
+        });
+      } catch (notificationError) {
+        console.error("Error creating notification:", notificationError);
+        // Continue even if notification fails
+      }
+      
+      // Keep booking status as draft since payment couldn't be completed
+      // Optional: Update booking to indicate Stripe payment was attempted
+      const { error: updateError } = await supabase
+        .from("bookings")
+        .update({
+          status: "pending", // Change from draft to pending even though payment couldn't be completed
+          payment_status: "pending",
+          notes: booking.notes + "\n\nNote: Stripe payment was attempted but is not currently available."
+        })
+        .eq("id", booking.id);
+      
+      if (updateError) {
+        console.error("Error updating booking:", updateError);
+      } else {
+        console.log("Successfully updated booking status from draft to pending for Stripe user");
+      }
+      
+      setProcessingPayment(false);
+      
+      // // Navigate to messaging with the provider
+      // navigate(`/messages?user=${booking.provider_id}`);
+      
+      return;
+      
+      // The code below would be used when Stripe is available
+      /*
       const amounts = calculateAmounts();
       
       // Call the real API endpoint
@@ -286,7 +409,7 @@ export default function PaymentPage() {
           booking_id: booking.id,
           service_id: service.id,
           customer_id: user.id,
-          provider_id: service.user_id,
+          provider_id: service.owner_id,
           amount: amounts.total.toString(),
           success_url: `${window.location.origin}/payment/${booking.id}?payment_status=success&source=stripe`,
           cancel_url: `${window.location.origin}/payment/${booking.id}?payment_status=canceled&source=stripe`
@@ -302,6 +425,7 @@ export default function PaymentPage() {
       
       // Redirect to the Stripe hosted checkout page
       window.location.href = sessionData.url;
+      */
     } catch (error) {
       console.error('Stripe checkout error:', error);
       setProcessingPayment(false);
@@ -327,24 +451,51 @@ export default function PaymentPage() {
     setProcessingPayment(true);
 
     try {
-      // Check if Paystack JS is loaded
-      if (typeof window.PaystackPop === 'undefined') {
-        // Load Paystack script if not already loaded
-        const script = document.createElement('script');
-        script.src = 'https://js.paystack.co/v1/inline.js';
-        script.async = true;
-        script.onload = () => {
-          // Once script is loaded, initialize payment
-          initializePaystackPayment();
-        };
-        script.onerror = () => {
-          throw new Error('Failed to load Paystack script');
-        };
-        document.body.appendChild(script);
-      } else {
-        // If already loaded, initialize payment directly
+      // Check if Paystack script already exists
+      const existingScript = document.getElementById('paystack-script');
+      
+      if (existingScript || typeof window.PaystackPop !== 'undefined') {
+        console.log('Paystack script already loaded, initializing payment');
         initializePaystackPayment();
+        return;
       }
+      
+      console.log('Loading Paystack script...');
+      // Create and append the script
+      const script = document.createElement('script');
+      script.id = 'paystack-script';
+      script.src = 'https://js.paystack.co/v1/inline.js';
+      script.async = true;
+      
+      script.onload = () => {
+        console.log('Paystack script loaded successfully');
+        // Check if PaystackPop is defined
+        if (typeof window.PaystackPop === 'undefined') {
+          console.error('PaystackPop is undefined even after script load');
+          toast({
+            title: "Payment Error",
+            description: "Unable to initialize payment. Please try again or contact support.",
+            variant: "destructive",
+          });
+          setProcessingPayment(false);
+          return;
+        }
+        
+        // Once script is loaded, initialize payment
+        initializePaystackPayment();
+      };
+      
+      script.onerror = (e) => {
+        console.error('Failed to load Paystack script:', e);
+        toast({
+          title: "Payment Error",
+          description: "Unable to load payment provider. Please try again later.",
+          variant: "destructive",
+        });
+        setProcessingPayment(false);
+      };
+      
+      document.body.appendChild(script);
     } catch (error) {
       console.error('Paystack initialization error:', error);
       toast({
@@ -362,32 +513,57 @@ export default function PaymentPage() {
     const { total } = calculateAmounts();
     const amountInKobo = Math.round(total * 100); // Convert to kobo (smallest currency unit)
     
-    console.log(`Initializing Paystack with: ${user!.email}, amount: ${amountInKobo}, ref: booking_${booking!.id}_${Date.now()}`);
+    // Ensure booking and service exist before proceeding
+    if (!booking || !service || !user?.email) {
+      console.error('Missing required data for Paystack initialization');
+      toast({
+        title: "Payment Error",
+        description: "Missing required information for payment. Please try again.",
+        variant: "destructive",
+      });
+      setProcessingPayment(false);
+      return;
+    }
+    
+    // Determine the currency to use
+    // Paystack primarily supports NGN, GHS, ZAR, and USD - defaults to NGN if unsupported
+    const serviceCurrency = service?.currency_created_in || 'NGN';
+    const paystackCurrency = ['NGN', 'GHS', 'ZAR', 'USD'].includes(serviceCurrency) 
+      ? serviceCurrency 
+      : (currency === 'NGN' ? 'NGN' : 'USD');
+    
+    const bookingId = booking.id;
+    const bookingPrice = service.price;
+    const providerId = booking.provider_id;
+    const serviceId = service.id;
+    const userEmail = user.email;
+    const userId = user.id;
+    
+    console.log(`Initializing Paystack with: ${userEmail}, amount: ${amountInKobo}, currency: ${paystackCurrency}, ref: booking_${bookingId}_${Date.now()}`);
     
     try {
       const handler = window.PaystackPop.setup({
-        key: 'pk_test_your_public_key', // Replace with your Paystack public key in production
-        email: user!.email!,
+        key: 'pk_test_38aea9d6ea64f9e748b5b225127d3bf7ba8390e9', // Replace with your Paystack public key in production
+        email: userEmail || 'awoyelejerry.14@gmail.com',
         amount: amountInKobo,
-        currency: currency === 'NGN' ? 'NGN' : 'USD', // Use NGN for Nigeria, USD for others
-        ref: `booking_${booking!.id}_${Date.now()}`,
-        callback: async function(response: any) {
+        currency: paystackCurrency, // Use appropriate currency
+        ref: `booking_${bookingId}_${Date.now()}`,
+        callback: function(response: PaystackResponse) {
           console.log('Paystack payment successful:', response);
           
-          try {
-            // Create escrow payment record
-            const payment = await EscrowService.createPayment(
-              booking!.id,
-              service!.price,
-              user!.id,
-              booking!.provider_id,
-              service!.id,
-              false, // Not external
-              undefined, // No payment ID
-              'paystack', // Gateway
-              response.reference // Transaction reference
-            );
-            
+          // Create escrow payment record
+          EscrowService.createPayment(
+            bookingId,
+            bookingPrice,
+            userId,
+            providerId,
+            serviceId,
+            false, // Not external
+            undefined, // No payment ID
+            'paystack', // Gateway
+            response.reference // Transaction reference
+          )
+          .then(payment => {
             if (!payment) {
               throw new Error('Failed to create payment record');
             }
@@ -400,7 +576,8 @@ export default function PaymentPage() {
             
             // Handle payment success
             handlePaymentSuccess();
-          } catch (error) {
+          })
+          .catch(error => {
             console.error('Error processing successful payment:', error);
             toast({
               title: "Payment Processing Error",
@@ -408,7 +585,7 @@ export default function PaymentPage() {
               variant: "destructive",
             });
             setProcessingPayment(false);
-          }
+          });
         },
         onClose: function() {
           console.log('Paystack payment window closed');
@@ -588,21 +765,50 @@ export default function PaymentPage() {
   };
 
   // Calculate amounts
-  const calculateAmounts = () => {
+  const calculateAmounts = useCallback(() => {
     if (!service) return { subtotal: 0, fee: 0, total: 0 };
+
+    const basePrice = service.price;
+    const serviceCurrency = service.currency_created_in || "USD";
     
-    const subtotal = service.price;
+    console.log(`Service price: ${formatCurrency(basePrice, serviceCurrency)}`);
+
+    // Calculate the subtotal based on the service's price and the display currency
+    let subtotal = basePrice;
     
-    // Use fixed fee calculation instead of percentage
-    const fee = calculateFixedPlatformFee(subtotal);
-    const total = subtotal + fee;
-    
+    // If the current display currency is different from the service currency, convert
+    if (currency !== serviceCurrency) {
+      console.log(`Converting from ${serviceCurrency} to ${currency}`);
+      subtotal = convertCurrency(basePrice, serviceCurrency, currency);
+      console.log(`Converted price: ${formatCurrency(subtotal, currency)}`);
+    } else {
+      console.log(`No conversion needed, already in ${currency}`);
+    }
+
+    // Calculate fee based on platform policy
+    const fee = FIXED_PLATFORM_FEE[currency] || 100; // Default to 100 if currency not found
+    console.log(`Platform fee: ${formatCurrency(fee, currency)}`);
+
+    // Calculate the total (explicitly force to number to avoid string concatenation)
+    const total = Number(subtotal) + Number(fee);
+    console.log(`Total amount: ${formatCurrency(total, currency)}`);
+
     return { subtotal, fee, total };
-  };
+  }, [service, currency]);
+
+  // Update state when calculations change
+  useEffect(() => {
+    if (service) {
+      const amounts = calculateAmounts();
+      setSubtotal(amounts.subtotal);
+      setFee(amounts.fee);
+      setTotal(amounts.total);
+    }
+  }, [service, currency, calculateAmounts]);
 
   // Format the platform fee based on the currency
   const formatPlatformFee = (fee: number): string => {
-    console.log("Formatting platform fee:", fee, "Currency:", currency);
+    if (!fee && fee !== 0) return `${symbol}0`;
     
     if (currency === 'NGN') {
       // For NGN, directly use the symbol and the fee without conversion
@@ -702,7 +908,10 @@ export default function PaymentPage() {
             </div>
           ) : (
             <>
-              {PAYSTACK_SUPPORTED_COUNTRIES.includes(userCountry || '') ? (
+              {/* Always show Paystack for Nigerian users or those in supported countries */}
+              {(preferredGateway === 'paystack' || 
+                PAYSTACK_SUPPORTED_COUNTRIES.includes(userCountry || '') || 
+                PAYSTACK_SUPPORTED_COUNTRIES.includes((userCountry || '').toLowerCase())) ? (
                 // Show Paystack for supported countries
                 <div className="space-y-4">
                   <Button 
@@ -718,7 +927,12 @@ export default function PaymentPage() {
                     ) : (
                       <>
                         <span className="mr-2">{symbol}</span>
-                        Pay {currency === 'NGN' ? `${calculateAmounts().total}` : formatPrice(calculateAmounts().total)} with Paystack
+                        Pay {currency === 'NGN' ? `${total}` : formatPrice(total)} with Paystack
+                        {service && currency !== service.currency_created_in && (
+                          <span className="ml-1 text-xs opacity-80">
+                            (Converted from {service.currency_created_in})
+                          </span>
+                        )}
                       </>
                     )}
                   </Button>
@@ -757,6 +971,47 @@ export default function PaymentPage() {
             </>
           )}
         </div>
+        
+        {/* Debug options - only visible in development mode */}
+        {process.env.NODE_ENV === "development" && (
+          <div className="mt-4 pt-4 border-t border-dashed">
+            <h4 className="text-sm font-medium mb-2">Debug Options</h4>
+            <div className="text-xs text-muted-foreground mb-2">
+              <div>Country: {userCountry || "Not detected"}</div>
+              <div>Preferred Gateway: {preferredGateway}</div>
+              <div>Paystack Supported: {PAYSTACK_SUPPORTED_COUNTRIES.includes(userCountry || '') || 
+                PAYSTACK_SUPPORTED_COUNTRIES.includes((userCountry || '').toLowerCase()) ? "Yes" : "No"}</div>
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                size="sm" 
+                variant="outline" 
+                onClick={() => {
+                  handleCountryDetected("nigeria");
+                  toast({
+                    title: "Debug",
+                    description: "Country set to Nigeria",
+                  });
+                }}
+              >
+                Set Country: Nigeria
+              </Button>
+              <Button 
+                size="sm" 
+                variant="outline" 
+                onClick={() => {
+                  setPreferredGateway('paystack');
+                  toast({
+                    title: "Debug",
+                    description: "Gateway set to Paystack",
+                  });
+                }}
+              >
+                Force Paystack
+              </Button>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -788,7 +1043,7 @@ export default function PaymentPage() {
             </div>
             <h1 className="text-2xl font-bold mb-2">Payment Successful!</h1>
             <p className="text-muted-foreground mb-6 max-w-md">
-              Your payment of {formatPrice(calculateAmounts().total)} has been processed and is securely held in escrow until the service is completed.
+              Your payment of {formatCurrency(Number(subtotal) + Number(fee), currency)} has been processed and is securely held in escrow until the service is completed.
             </p>
             
             <Card className="w-full max-w-md mb-6">
@@ -798,16 +1053,22 @@ export default function PaymentPage() {
               <CardContent className="space-y-4">
                 <div className="flex justify-between">
                   <span>Service Fee</span>
-                  <span>{formatPrice(calculateAmounts().subtotal)}</span>
+                  <span>{formatCurrency(service.price, service.currency_created_in || 'USD')}</span>
                 </div>
+                {currency !== service?.currency_created_in && (
+                  <div className="flex justify-between text-sm text-muted-foreground">
+                    <span>Converted to {currency}</span>
+                    <span>{formatCurrency(subtotal, currency)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span>Platform Fee</span>
-                  <span>{formatPlatformFee(calculateAmounts().fee)}</span>
+                  <span>{formatPlatformFee(fee)}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between font-bold">
-                  <span>Total</span>
-                  <span>{formatPrice(calculateAmounts().total)}</span>
+                  <span>Total ({currency})</span>
+                  <span>{formatCurrency(Number(subtotal) + Number(fee), currency)}</span>
                 </div>
               </CardContent>
               <CardFooter className="bg-muted/20 flex flex-col items-start p-4">
@@ -924,22 +1185,34 @@ export default function PaymentPage() {
                       <span>Service provider:</span>
                       <span>{provider?.business_name || provider?.username}</span>
                     </div>
+                    {service && (
+                      <div className="flex items-center justify-between text-sm">
+                        <span>Original price:</span>
+                        <span>{formatCurrency(service.price, service.currency_created_in || 'USD')}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
                 
                 <div className="space-y-3">
                   <div className="flex justify-between">
                     <span>Service Fee</span>
-                    <span>{formatPrice(calculateAmounts().subtotal)}</span>
+                    <span>{formatCurrency(service.price, service.currency_created_in || 'USD')}</span>
                   </div>
+                  {currency !== service?.currency_created_in && (
+                    <div className="flex justify-between text-sm text-muted-foreground">
+                      <span>Converted to {currency}</span>
+                      <span>{formatCurrency(subtotal, currency)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <span>Platform Fee</span>
-                    <span>{formatPlatformFee(calculateAmounts().fee)}</span>
+                    <span>{formatPlatformFee(fee)}</span>
                   </div>
                   <Separator />
                   <div className="flex justify-between font-bold">
-                    <span>Total</span>
-                    <span>{formatPrice(calculateAmounts().total)}</span>
+                    <span>Total ({currency})</span>
+                    <span>{formatCurrency(Number(subtotal) + Number(fee), currency)}</span>
                   </div>
                 </div>
               </CardContent>

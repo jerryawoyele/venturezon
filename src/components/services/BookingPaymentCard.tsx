@@ -196,6 +196,10 @@ export const BookingPaymentCard = ({ booking, onPaymentAction }: BookingPaymentC
       return <Badge variant="outline" className="bg-blue-50 text-blue-600">Awaiting Customer Confirmation</Badge>;
     }
     
+    if (booking.status === 'confirm_service') {
+      return <Badge variant="outline" className="bg-green-50 text-green-600">Ready For Confirmation</Badge>;
+    }
+    
     if (!payment) {
       return <Badge variant="outline" className="bg-yellow-50 text-yellow-700">No Payment</Badge>;
     }
@@ -220,6 +224,45 @@ export const BookingPaymentCard = ({ booking, onPaymentAction }: BookingPaymentC
   const canRefund = payment && ['completed', 'pending'].includes(payment.status);
   // Can mark as completed when booking is confirmed and not already pending completion
   const canMarkCompleted = booking.status === 'confirmed';
+
+  // Show confirmation card when status is confirm_service
+  if (booking.status === 'confirm_service') {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Service Completion</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-start gap-3 pb-3">
+            <div className="p-2 bg-green-100 rounded-full">
+              <CheckCircle className="h-5 w-5 text-green-600" />
+            </div>
+            <div>
+              <h3 className="font-medium mb-1">Service Ready For Confirmation</h3>
+              <p className="text-sm text-muted-foreground">
+                The service provider has marked this service as completed. Please confirm if the service has been completed to your satisfaction.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+        <CardFooter className="flex gap-2">
+          <Button 
+            className="flex-1"
+            onClick={() => onPaymentAction('confirm_completion', booking.id)}
+          >
+            Confirm Completion
+          </Button>
+          <Button 
+            variant="outline"
+            className="flex-1"
+            onClick={() => onPaymentAction('dispute', booking.id)}
+          >
+            Report Issue
+          </Button>
+        </CardFooter>
+      </Card>
+    );
+  }
 
   // Show completion card when there's no payment or payment info
   if (!payment && booking.status === 'confirmed') {

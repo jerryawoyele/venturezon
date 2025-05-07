@@ -105,6 +105,7 @@ export function ServiceBookingsModal({
       if (activeTab === "confirmed") return booking.status === "confirmed";
       if (activeTab === "completed") return booking.status === "completed";
       if (activeTab === "canceled") return booking.status === "canceled";
+      if (activeTab === "pending_completion") return booking.status === "pending_completion" || booking.status === "confirm_service";
       return true;
     });
   };
@@ -339,7 +340,7 @@ export function ServiceBookingsModal({
                         <>
                           <Button 
                             size="sm" 
-                            onClick={() => handleStatusChange(booking.id, "completed")}
+                            onClick={() => handleStatusChange(booking.id, "pending_completion")}
                           >
                             Mark as Completed
                           </Button>
@@ -360,6 +361,16 @@ export function ServiceBookingsModal({
                           disabled
                         >
                           Awaiting Customer Confirmation
+                        </Button>
+                      )}
+
+                      {booking.status === "confirm_service" && (
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          disabled
+                        >
+                          Customer Needs To Confirm
                         </Button>
                       )}
 
